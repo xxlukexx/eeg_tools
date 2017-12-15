@@ -1,14 +1,80 @@
-% to-do
+% ECKEEGVis - ECK EEG Visualiser
+% Version: Alpha 0.1
 %
-% 1. Make hover selection based on nearest to cursor, to avoid multiple
-% channels being higlighted at once.
+% This tool will visualise segmented fieldtrip EEG data, and allow you to
+% mark artefacts. 
 %
-% 2. Drawing channel labels is slow. Draw to offscreen window only when
-% zoom changes, then blit this to the main window on each screen refresh. 
+% Prerequisites:
+%
+% It requires fieldtrip to be installed and on the matlab path. It also
+% requires psychtoolbox to be installed. You can get these from:
+%
+% fieldtrip (developed on rev 20180314): www.fieldtriptoolbox.org/download
+% psychtoolbox (developed on v3.0.12): psychtoolbox.org/download/
+%
+%
+% Getting started:
+%
+% The tool is coded as a Matlab class object. To use it, you must first
+% create an instance of the class. You can call it anything you like: 
+%
+% eegvis = ECKEEGVis;
+%
+% To load some data, set the Data property to a fieldtrip structure,
+% containing segmented data:
+%
+% eegvis.Data = data;
+%
+% To begin interacting with the data, call the StartInteractive method:
+%
+% eegvis.StartInteractive
+%
+% You can then click on each channel to mark/unmark as an artefact.
 % 
-% 3. Instructions for keypresses
+% 
+% Keyboard controls:
 %
-% 4. Live averaging over n trials either side of current
+% There are a number of keyboard controls, which will become active when
+% you call the StartInteractive method:
+%
+%   Right arrow         -   Display next trial
+%   Left arrow          -   Display previous trial
+%   Up arrow            -   Decrease y scale (make data larger)
+%   Down arrow          -   Increase y scale (make data smaller)
+%   y                   -   Auto set y scale (press to toggle)
+%   f                   -   Toggle fullscreen mode
+%   +                   -   Zoom in
+%   -                   -   Zoom out
+%   c                   -   Recentre & reset zoom
+%   a                   -   Mark all channels 
+%   n                   -   Unmark all channels
+%   CTRL                -   Hold, click and drag to pan 
+%   ESCAPE              -   End interactive mode
+%   <                   -   Step to previous entry in history
+%   >                   -   Step to next entry in history
+%
+%
+% Artefact structure
+%
+% The tool will create two extra fields on a fieldtrip data set; art and
+% artType. 
+%
+% art -     contains a [numChans x NumTrials] logical matrix. Each
+%           element represents one particulator channel x trial 
+%           combination (e.g. Af7 on trial 21). A true means an artefact 
+%           is present, false means clean. 
+%
+% arttype - contains a [numChans x numTrials] cell array matrix of strings.
+%           Optionally (depending upon the function that works on the data)
+%           contains a string recording the source of the artefact. This
+%           tool writes 'manual' to this structure. 
+%
+% ! IT IS IMPORTANT TO SAVE THE DATA AFTER MARKING ARTEFACTS! You can do
+% this by extracting the artefact-detected data from the tool...
+%
+% data_marked = eegvis.Data;
+%
+% ...and saving the variable. 
 
 classdef ECKEEGVis < handle
     
