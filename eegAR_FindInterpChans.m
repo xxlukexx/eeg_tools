@@ -1,6 +1,31 @@
 function [canInterp, canInterpLab, nb, summary] =...
     eegAR_FindInterpChans(data, bad, cmdEcho, nb)
 
+    % [canInterp, canInterpLab, nb, summary] =...
+    %       eegAR_FindInterpChans(data, bad, cmdEcho, nb)
+    %
+    % Find channels neighbouring bad channels, which can be interpolated.
+    % Depending upon the electrode montage, and the distance criterion used
+    % for finding neighbours, there may be several possible neighbours that
+    % could be used for interpolation. These neighbours may themselves be
+    % bad, however, in which case we do not want to interpolate from them.
+    %
+    % INPUT ARGS
+    % data          -   fieldtrip data
+    % bad           -   logical index of bad channels
+    % cmdEcho       -   (optional) echo summary to command window
+    % nb            -   (optional) fieldtrip neighbours structure. Will be
+    %                   calculated if not supplied. Save time by passing a
+    %                   previously used structure. 
+    %
+    % OUTPUT ARGS
+    % canInterp     -   logical index of which channels can be interpolated
+    %                   from
+    % canInterpLab  -   cell array of strings, containing labels of
+    %                   channels that can be interpolated
+    % nb            -   fieldtrip neighbours structure
+    % summary       -   table of results
+    
     % defaults
     canInterp = false(size(bad));
     canInterpLab = {};
@@ -103,9 +128,6 @@ function [canInterp, canInterpLab, nb, summary] =...
     
     % if any can be interpolated, make string of labels
     if any(canInterp(bad))
-%         labs = cellfun(@(x) [x, ' '], data.label(canInterp(bad)),...
-%             'uniform', false);
-%         canInterpLab = horzcat(labs{:});
         canInterpLab = data.label(canInterp);
     end
     

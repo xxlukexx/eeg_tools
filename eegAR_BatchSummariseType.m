@@ -1,5 +1,6 @@
 function [tab_count, tab_prop] = eegAR_BatchSummariseType(smry)
 
+    % 
     stat = ECKStatus('Summarising artefact types...');
     
     % find unique artefact types

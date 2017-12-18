@@ -1,5 +1,19 @@
 function [art, reject] = eegAR_Range(data, valRange, chExcl)
 
+    % [art, reject] = eegAR_Range(data, valRange, chExcl)
+    %
+    % Find channels with a voltage range (max - min) above criterion. 
+    %
+    % INPUT ARGS
+    % data          -   fieldtrip data
+    % valRange      -   maximum range value, above which is an artefact
+    % chExcl        -   (optional) logical index of channels. Useful to
+    %                   exclude all but frontal channels
+    %
+    % OUTPUT ARGS
+    % reject        -   artefact definition in fieltrip format. Not very
+    %                   useful and may not work
+    
     % check whether any channels are being excluded
     if ~exist('chExcl', 'var') || isempty(chExcl)
         chExcl = false(size(data.label));

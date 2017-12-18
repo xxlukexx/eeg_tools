@@ -1,5 +1,13 @@
 function [art, reject] = eegAR_Flat(data)
 
+    % [art, reject] = eegAR_Flat(data)
+    %
+    % Find flat channels, defined as channel x trial combinations with all
+    % voltages <.0001 uV
+    %
+    % INPUT ARGS
+    % data          -   fieldtrip data
+    
     % check whether any channels are being excluded
     if ~exist('chExcl', 'var') || isempty(chExcl)
         chExcl = false(size(data.label));

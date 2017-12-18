@@ -1,6 +1,12 @@
 function art = eegAR_Combine(varargin)
 
-    % note that entries in varargin can be empty instead of artefact
+    % art = eegAR_Combine(varargin)
+    %
+    % Takes any number of artefacts structures and combines them. Use this
+    % when you have run multiple different algorithms (e.g. min/max, eog)
+    % and want to combine the results into one artefact structure. 
+    %
+    % n.b. that entries in varargin can be empty instead of artefact
     % structs. This allows for optional artefact detection in the calling
     % script, which, if disabled, returns an empty variable which will then
     % be ignored by this function

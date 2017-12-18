@@ -1,5 +1,10 @@
 function art = eegAR_Summarise(data, art)
 
+    % art = eegAR_Summarise(data, art)
+    %
+    % Summary statistics about artefact detection. Takes as an input an art
+    % structure (with artefacts in art.matrix)
+    
     art.numBad = sum(art.matrix(:));
     art.numGood = sum(~art.matrix(:));
     art.propBad = art.numBad / (art.numBad + art.numGood);

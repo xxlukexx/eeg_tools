@@ -1,5 +1,18 @@
 function art = eegAR_Alpha(data, valMax, chExcl, timeRange)
 
+    % art = eegAR_Alpha(data, valMax, chExcl, timeRange)
+    %
+    % Detects alpha bursts, by marking channel x trial segments with an
+    % alpha power exceeding valMax standard deviations of the mean. This is
+    % achieved by z-scoring the data for all trials (therefore valMax is
+    % relative to the distribution of alpha power at all channels over all
+    % trials). 
+    %
+    % data          -   fieldtrip data
+    % valMax        -   number of SDs to detect alpha bursts at
+    % chExcl        -   (optional) logical index of channels
+    % timeRange     -   not yet implenented
+    
     % check whether any channels are being excluded
     if ~exist('chExcl', 'var') || isempty(chExcl)
         chExcl = false(size(data.label));

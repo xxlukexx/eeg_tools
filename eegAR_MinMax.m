@@ -1,7 +1,24 @@
 function [art, reject] =...
     eegAR_MinMax(data, valMin, valMax, chExcl, timeRange)
 
-    % check whether any channels are being excluded
+    % [art, reject] = eegAR_MinMax(data, valMin, valMax, chExcl, timeRange)
+    %
+    % Find chnanels with absolute voltage values that exceed a min and max
+    % criterion. 
+    %
+    % INPUT ARGS
+    % data          -   fieldtrip data
+    % valMin        -   minimum voltage value, below which is an artefact
+    % valMax        -   maximum voltage value, above which is an artefact
+    % chExcl        -   (optional) logical index of channels. Useful to
+    %                   exclude all but frontal channels
+    % timeRange     -   time range upon which to detect artefacts (relative
+    %                   to trial onset)
+    %
+    % OUTPUT ARGS
+    % reject        -   artefact definition in fieltrip format. Not very
+    %                   useful and may not work
+    
     if ~exist('chExcl', 'var') || isempty(chExcl)
         chExcl = false(size(data.label));
     end

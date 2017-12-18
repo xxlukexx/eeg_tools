@@ -1,6 +1,22 @@
 function [art, reject] =...
     eegAR_EOGStat(data, crit, chExcl, timeRange, rerefChan)
 
+    % art = eegAR_EOGStat(data, crit, chExcl, timeRange, rerefChan)
+    %
+    % Detects blinks. Uses two criteria: 1) samples outside crit SDs from
+    % the mean voltage across thet trials; and, 2) channels which fit a
+    % second order polynomial curve with a R2 > 0.6. (1) is quite good at
+    % detecting the shape of blinks in frontal channels. (2) detects drifts
+    % across the channel (usually an eye movement). 
+    %
+    % data          -   fieldtrip data
+    % crit          -   samples with voltage > crit SDs from the mean will
+    %                   be detected
+    % chExcl        -   (optional) logical index of channels. Useful to
+    %                   exclude all but frontal channels
+    % timeRange     -   time range upon which to detect artefacts (relative
+    %                   to trial onset)
+    
     % check whether any channels are being excluded
     if ~exist('chExcl', 'var') || isempty(chExcl)
         chExcl = false(size(data.label));
