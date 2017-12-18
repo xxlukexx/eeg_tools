@@ -2,6 +2,35 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
     interpMat, interpNeigh, cantInterp] =...
     eegInterpTrial(data, art, distance, nb)
 
+    % [data, chanInterp, trialInterp, totInterp, propInterp,...
+    %       interpMat, interpNeigh, cantInterp] =...
+    %       eegInterpTrial(data, art, distance, nb)
+    %
+    % Interpolate channels on a per-trial basis. 
+    %
+    % INPUT ARGS
+    % data          -   fieldtrip data
+    % art           -   artefact matrix, logical, [channels x trials]
+    % distance      -   (optional) max distance to neighbouring electrodes
+    %                   for them to be be interpolated from (def. 50ms)
+    % nb            -   (optional) fieldtrip neighbours structure. Will be
+    %                   calculated if not supplied. Save time by passing a
+    %                   previously used structure. 
+    %
+    % OUTPUT ARGS
+    % data          -   intepolated data
+    % chanInterp    -   number of interpolated channels per trial
+    % trialInterp   -   number of interpolated trials per channel
+    % totInterp     -   total number of channel x trial interpolations
+    % propInterp    -   proportion of channel x trial combinations that
+    %                   were interpolated
+    % interpMat     -   [channel x trial] matrix, indicating which channel
+    %                   x trial combinations were interpolated
+    % interpNeigh   -   for each channel, indices of neighbouring channels
+    %                   that were used to interpolate from
+    % cantInterp    -   indices of channels that were bad, but could not be
+    %                   interpolated due to having no clean neighbours
+    
     numBad = 0;
     numInterp = 0;
     interpMat = false(length(data.label), length(data.trial));
