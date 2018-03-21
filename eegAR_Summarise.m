@@ -1,21 +1,20 @@
-function art = eegAR_Summarise(data, art)
+function smry = eegAR_Summarise(data, smry)
 
     % art = eegAR_Summarise(data, art)
     %
-    % Summary statistics about artefact detection. Takes as an input an art
-    % structure (with artefacts in art.matrix)
+    % Summary statistics about artefact detection. 
     
-    art.numBad = sum(art.matrix(:));
-    art.numGood = sum(~art.matrix(:));
-    art.propBad = art.numBad / (art.numBad + art.numGood);
-    art.trialsBad = sum(any(art.matrix, 1));
-    art.trialsGood = sum(all(~art.matrix, 1));
-    art.trialsProp = art.trialsBad / (art.trialsBad + art.trialsGood);
-    art.trialBreakdown = sum(art.matrix, 1);
-    art.chansBad = sum(any(art.matrix, 2));
-    art.chansGood = sum(all(~art.matrix, 2));
-    art.chansProp = art.chansBad / (art.chansBad + art.chansGood);
-    art.chanBreakdown = sum(art.matrix, 2);
-    art.chanLabel = data.label;
+    smry.numBad = sum(data.art(:));
+    smry.numGood = sum(~data.art(:));
+    smry.propBad = smry.numBad / (smry.numBad + smry.numGood);
+    smry.trialsBad = sum(any(data.art, 1));
+    smry.trialsGood = sum(all(~data.art, 1));
+    smry.trialsProp = smry.trialsBad / (smry.trialsBad + smry.trialsGood);
+    smry.trialBreakdown = sum(data.art, 1);
+    smry.chansBad = sum(any(data.art, 2));
+    smry.chansGood = sum(all(~data.art, 2));
+    smry.chansProp = smry.chansBad / (smry.chansBad + smry.chansGood);
+    smry.chanBreakdown = sum(data.art, 2);
+    smry.chanLabel = data.label;
     
 end

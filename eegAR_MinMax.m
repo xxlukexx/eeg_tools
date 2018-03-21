@@ -11,7 +11,7 @@ function [art, reject] =...
     % valMin        -   minimum voltage value, below which is an artefact
     % valMax        -   maximum voltage value, above which is an artefact
     % chExcl        -   (optional) logical index of channels. Useful to
-    %                   exclude all but frontal channels
+    %                   exclude e.g. all but frontal channels
     % timeRange     -   time range upon which to detect artefacts (relative
     %                   to trial onset)
     %
