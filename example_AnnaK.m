@@ -17,7 +17,8 @@ data_clean = eegAR_Detect(data_clean, 'method', 'minmax', 'threshold', [-5, 5]);
 chanNoisy = eegAR_ChannelThreshold(data_final, .9);
 % interpolate
 data_int = eegInterpTrial2(data_clean, 5);
-% reset AR marks post-interpolation
+% reset AR marks post-interpolation (so interpolated channels aren't marked
+% as having artefacts any more)
 data_int = eegAR_ResetArtFromInterp(data_int);
 % manual edit
 vis = ECKEEGVis;
