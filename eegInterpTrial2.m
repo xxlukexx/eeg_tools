@@ -64,6 +64,9 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
     excl = false(length(data.label), length(data.trial));
     
     % loop through trials
+    tmp_trial = data.trial;
+    tmp_canInterp = cell(numTrials, 1);
+    tmp_bad = cell(numTrials, 1);
     parfor tr = 1:numTrials
         
         % check that there are some channels with artefacts on this current
@@ -92,7 +95,6 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
                 
         
         if any(canInterp)
-            
             % interpolate
             cfg = [];
             cfg.method = 'spline';
@@ -101,15 +103,13 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
             cfg.trials = 1;
             tmpi = ft_channelrepair(cfg, tmp);
 
-            
             % replace original trial data
 %             data.trial{tr} = tmpi.trial{:};
-            
-            tmp_trial{tr} = tmpi.trial{1};
-            
+
+            % store interpolated data in temp structure
+            tmp_trial{tr} = tmpi.trial{1};            
             tmp_bad{tr} = bad;
             tmp_canInterp{tr} = canInterp;
-            
         end
 
     end
