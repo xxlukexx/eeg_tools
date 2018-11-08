@@ -4,17 +4,44 @@ function smry = eegAR_Summarise(data, smry)
     %
     % Summary statistics about artefact detection. 
     
-    smry.numBad = sum(data.art(:));
-    smry.numGood = sum(~data.art(:));
-    smry.propBad = smry.numBad / (smry.numBad + smry.numGood);
-    smry.trialsBad = sum(any(data.art, 1));
-    smry.trialsGood = sum(all(~data.art, 1));
-    smry.trialsProp = smry.trialsBad / (smry.trialsBad + smry.trialsGood);
-    smry.trialBreakdown = sum(data.art, 1);
-    smry.chansBad = sum(any(data.art, 2));
-    smry.chansGood = sum(all(~data.art, 2));
-    smry.chansProp = smry.chansBad / (smry.chansBad + smry.chansGood);
-    smry.chanBreakdown = sum(data.art, 2);
-    smry.chanLabel = data.label;
+    % combos - trial x channel combinations
+    anyArt = any(data.art, 3);
+    smry.combos.total = numel(anyArt);
+    smry.combos.good = sum(~anyArt(:));
+    smry.combos.bad = sum(anyArt(:));
+    smry.combos.propGood = prop(~anyArt(:));
     
+    % trials 
+    trArt = any(anyArt, 1);
+    smry.trials.total = length(trArt);
+    smry.trials.good = sum(~trArt);
+    smry.trials.bad = sum(trArt);
+    smry.trials.propGood = smry.trials.good / smry.trials.total;
+    
+    % channels
+    chArt = any(anyArt, 2);
+    smry.channels.total = length(chArt);
+    smry.channels.good = sum(~chArt);
+    smry.channels.bad = sum(chArt);
+    smry.channels.propGood = smry.channels.good / smry.channels.total;
+        
+    % breakdown by event
+    if isfield(data, 'trialinfo')
+        % get event subscripts
+        [ev_u, ~, ev_s] = unique(data.trialinfo);
+        % calculate stats over each event type
+        ev_total = accumarray(ev_s, trArt, [], @(x) size(x, 1))';
+        ev_tpc = accumarray(ev_s, ~trArt, [], @sum)';
+        ev_prop = accumarray(ev_s, 1 - trArt, [], @prop)';
+        if iscell(ev_u)
+            varNames = cellfun(@(x) sprintf('Cond_%s', x), ev_u,...
+                'uniform', false);
+        else
+            varNames = arrayfun(@(x) sprintf('Cond_%d', x), ev_u,...
+                'uniform', false);
+        end
+        smry.event = array2table([ev_total; ev_tpc; ev_prop], 'RowNames',...
+            {'Total', 'Num_good', 'Prop_good'}, 'VariableNames', varNames);
+    end
+        
 end

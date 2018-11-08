@@ -305,6 +305,10 @@ classdef ECKEEGVis < handle
                 obj.privDataValid = false;
                 return
             end
+            
+            if ~isfield(obj.privData, 'art_type')
+                obj.privData.art_type = [];
+            end
            
             % update number of trials, and current trial number
             obj.privNumTrials = length(obj.privData.trial);

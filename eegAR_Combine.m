@@ -52,7 +52,7 @@ function art = eegAR_Combine(varargin)
         end
     end
 
-    % summarise
-    art = eegAR_Summarise(varargin{1}, art);
+%     % summarise
+%     art = eegAR_Summarise(varargin{1}, art);
 
 end

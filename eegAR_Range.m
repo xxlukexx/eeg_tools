@@ -45,6 +45,6 @@ function [art, reject] = eegAR_Range(data, valRange, chExcl)
 
     end
     
-    art = eegAR_Summarise(data, art);
+%     art = eegAR_Summarise(data, art);
 
 end

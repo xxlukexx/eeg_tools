@@ -60,6 +60,6 @@ function [art, reject] =...
 
     end
     
-    art = eegAR_Summarise(data, art);
+%     art = eegAR_Summarise(data, art);
 
 end
