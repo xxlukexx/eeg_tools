@@ -320,9 +320,10 @@ classdef ECKEEGVis < handle
             
             % prepare layout for 2D plotting
             cfg = [];
-            cfg.rotate = 270;
+%             cfg.rotate = 270;
             cfg.skipscale = 'yes';
             cfg.skipcomnt = 'yes';
+            cfg.layout = 'elec1020.lay';
 %             cfg.layout = '/Users/luke/Google Drive/Experiments/face erp/fieldtrip-20170314/template/electrode/GSN-HydroCel-129.sfp';
             obj.privLayout = ft_prepare_layout(cfg, obj.privData);
             obj.privLayout.pos(:, 1) = -obj.privLayout.pos(:, 1);
