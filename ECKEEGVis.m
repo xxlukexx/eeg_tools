@@ -320,13 +320,18 @@ classdef ECKEEGVis < handle
             
             % prepare layout for 2D plotting
             cfg = [];
-%             cfg.rotate = 270;
+            cfg.rotate = 270;
             cfg.skipscale = 'yes';
             cfg.skipcomnt = 'yes';
-            cfg.layout = 'elec1020.lay';
+            if isfield(obj.privData, 'elec')
+                cfg.layout = obj.privData.elec;
+            else
+                cfg.layout = 'EEG1010.lay';
+            end
+%             cfg.layout = 'EEG1010.lay';
 %             cfg.layout = '/Users/luke/Google Drive/Experiments/face erp/fieldtrip-20170314/template/electrode/GSN-HydroCel-129.sfp';
             obj.privLayout = ft_prepare_layout(cfg, obj.privData);
-            obj.privLayout.pos(:, 1) = -obj.privLayout.pos(:, 1);
+%             obj.privLayout.pos(:, 1) = -obj.privLayout.pos(:, 1);
             
             % remove layout channels not in data
             present = cellfun(@(x) ismember(x, obj.privData.label),...
@@ -490,7 +495,7 @@ classdef ECKEEGVis < handle
         % drawing
         function PrepareForDrawing(obj)
             
-            if ~obj.privDataValid,
+            if ~obj.privDataValid
                 obj.privDrawingPrepared = false;
                 return
             end
@@ -751,15 +756,16 @@ classdef ECKEEGVis < handle
                     
                     % channel labels
                     if obj.DrawChannelLabels
+                        str = obj.privLayout.label{ch};
                         tb = Screen('TextBounds', obj.privWinPtr,...
-                            obj.privData.label{ch});
+                            str);
                         labX = obj.privChanX(ch) +...
                             obj.privDrawOffset(1);
                         labY = obj.privChanY(ch) + obj.privChanH -...
                             tb(4) + obj.privDrawOffset(2);
                         
                         Screen('DrawText', obj.privWinPtr,...
-                            obj.privData.label{ch}, labX, labY,...
+                            str, labX, labY,...
                             obj.Col_Label, obj.Col_LabelBG);
                     end
                         

@@ -22,7 +22,7 @@ function data = eegAR_UpdateArt(data, m, type)
     numTrials       = length(data.trial);
     
     % does art field exist?
-    if ~isfield(data, 'art');
+    if ~isfield(data, 'art')
         data.art = false(numChans, numTrials);
         data.art_type = {type};
     elseif ~isfield(data, 'art_type')

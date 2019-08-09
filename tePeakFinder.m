@@ -41,6 +41,8 @@ classdef tePeakFinder < handle
         prRatingAggregateSubs
         prRatingAggregateValues
         prMetadataDirty = false
+        prTableUpdating = false
+        prTableSelectedRow 
     end 
     
     properties (Constant)
@@ -160,6 +162,9 @@ classdef tePeakFinder < handle
             for p = 1:size(pd, 1)
                 
                 % get ERP
+                if ~isfield(obj.SelectedData, pd(p).condition)
+                    continue
+                end
                 erp = obj.SelectedData.(pd(p).condition);
 
                 % find peak
@@ -249,6 +254,65 @@ classdef tePeakFinder < handle
             
         end
         
+        function UpdateSelection(obj, idx_row)
+            
+            % store selected row
+            obj.prTableSelectedRow = idx_row;
+            
+            % check for dirty data
+            if obj.prMetadataDirty
+                resp = questdlg('Metadata has changed. Save to database before continuing?',...
+                    'Metadata has changed', 'Save', 'Don''t Save', 'Save');
+                if isequal(resp, 'Save')
+                    obj.saveMetadata
+                end
+            end
+
+            obj.busy('Querying database...')
+            
+            col_guid = find(strcmpi('guid', obj.h_table.ColumnName));
+            obj.SelectedGUID = obj.h_table.Data{idx_row, col_guid};
+            obj.SelectedMetadata = obj.DatabaseClient.GetMetadata(...
+                'GUID', obj.SelectedGUID);
+            addlistener(obj.SelectedMetadata, 'Update', @obj.metadataChanged);
+            
+            % get data
+            if obj.getData
+            
+                % if successful, draw channels
+                obj.buildRatingAggregateLabels
+                obj.drawChannels('position', obj.pos_channels);
+                
+            end
+            
+            obj.drawInspector('position', obj.pos_inspector);
+            
+            obj.prTableUpdating = false; 
+            obj.notBusy
+            
+        end
+        
+        function PlotAllSubjects(obj, path_plot)
+            
+            if ~exist(path_plot, 'dir')
+                error('Path not found.')
+            end
+            
+            nd = obj.DatabaseClient.NumDatasets;
+            for i = 1:nd
+                
+                obj.UpdateSelection(i)
+                
+                file_plot = fullfile(path_plot,...
+                    sprintf('%s.png', obj.SelectedMetadata.ID));
+                fr = getframe(obj.h_figure);
+                im = frame2im(fr);
+                imwrite(im, file_plot)
+                
+            end
+            
+        end
+        
         % get / set
         function val = get.NumComponents(obj)
             val = size(obj.PeakDefinition, 1);
@@ -259,13 +323,17 @@ classdef tePeakFinder < handle
         end
         
         function set.SelectedMetadata(obj, val)
-            obj.prMetadataDirty = true;
+%             obj.prMetadataDirty = true;
             obj.SelectedMetadata = val;
         end
         
         function set.SelectedData(obj, val)
-            obj.prMetadataDirty = true;
+%             obj.prMetadataDirty = true;
             obj.SelectedData = val;
+        end
+        
+        function set.prMetadataDirty(obj, val)
+            obj.prMetadataDirty = val;
         end
         
     end
@@ -403,6 +471,9 @@ classdef tePeakFinder < handle
                 
                 % find appropriate time series
                 pd = table2struct(obj.PeakDefinition(c, :));
+                if ~isfield(obj.SelectedData, pd.condition)
+                    continue
+                end
                 erp = obj.SelectedData.(pd.condition);
                 
                 % find channel index
@@ -446,6 +517,22 @@ classdef tePeakFinder < handle
                         'parent', obj.h_channels_subplots(c),...
                         'MarkerFaceColor', 'r')
                 end 
+                
+            % label peak
+            text(mds.(md_lat) + .07, mds.(md_amp), sprintf('%.0fms',...
+                mds.(md_lat)* 1e3), 'parent', obj.h_channels_subplots(c));
+                
+                
+%             % draw window
+%             
+%                 pos_rect = [...
+%                     pd.window(1),...
+%                     min(ylim(h_sp)),...
+%                     pd.window(2),...
+%                     max(ylim(h_sp))];
+%                 rectangle('Position', pos_rect,...
+%                     'FaceColor', [.8, 0, 0, 0.1],...
+%                     'parent', obj.h_channels_subplots(c))
                 
             % make review dropdown
             
@@ -493,7 +580,11 @@ classdef tePeakFinder < handle
                 line([0, 0], [min(ylim(h_ax)), max(ylim(h_ax))],...
                     'parent', obj.h_channels_subplots(c),...
                     'color', 'k')
-
+                
+                % colour subplot by rating
+                col = obj.colourByLabel(rating);
+                set(obj.h_channels_subplots(c), 'color', col)
+                
             end 
             
         % make rating controls
@@ -639,40 +730,22 @@ classdef tePeakFinder < handle
         
         function selectionChanged(obj, ~, h)
             
-            % check for dirty data
-            if obj.prMetadataDirty
-                resp = questdlg('Metadata has changed. Save to database before continuing?',...
-                    'Metadata has changed', 'Save', 'Don''t Save', 'Save');
-                if isequal(resp, 'Save')
-                    obj.saveMetadata
-                end
-            end
+            if obj.prTableUpdating; return, end
+            obj.prTableUpdating = true;
             
-            obj.busy('Querying database...')
-            
-            % get GUID from table
+            % get new row
             if ~isempty(h.Indices)
-                idx = h.Indices(1);
+                idx_row = h.Indices(1);
             else
                 return
             end
             
-            obj.SelectedGUID = obj.h_table.Data{idx, 1};
-            obj.SelectedMetadata = obj.DatabaseClient.GetMetadata(...
-                'GUID', obj.SelectedGUID);
-            
-            % get data
-            if obj.getData
-            
-                % if successful, draw channels
-                obj.buildRatingAggregateLabels
-                obj.drawChannels('position', obj.pos_channels);
-                
+            % if row has not changed, return
+            if isequal(obj.prTableSelectedRow, idx_row)
+                return
             end
             
-            obj.drawInspector('position', obj.pos_inspector);
-            
-            obj.notBusy
+            obj.UpdateSelection(idx_row);
             
         end
         
@@ -737,7 +810,9 @@ classdef tePeakFinder < handle
                 end               
                 
                 % remove summary field (if present)
-                obj.SelectedData = rmfield(obj.SelectedData, 'summary');
+                if isfield(obj.SelectedData, 'summary')
+                    obj.SelectedData = rmfield(obj.SelectedData, 'summary');
+                end
                 
                 % check that all conditions in the peak def are present as
                 % fields in the ERP struct
@@ -764,7 +839,7 @@ classdef tePeakFinder < handle
             
         end
         
-        function suc = saveMetadata(obj)
+        function suc = saveMetadata(obj, varargin)
             
             obj.busy('Saving metadata to database...')
             
@@ -787,6 +862,14 @@ classdef tePeakFinder < handle
                 return
             end
             
+            % saving will update the ui table, so restore its
+            % selection
+            obj.DatabaseClient.SetUITableSelection(...
+                obj.prTableSelectedRow)
+                    
+            if suc, obj.prMetadataDirty = false; end
+            
+            obj.prTableUpdating = false;
             obj.notBusy
             
         end
@@ -858,8 +941,28 @@ classdef tePeakFinder < handle
         end
         
         function changeOnePeakRating(obj, idx, val)
-            lab = obj.buildLabel(idx, '');
+             lab = obj.buildLabel(idx, '');
             obj.SelectedMetadata.peakrating.(lab) = val;
+            % set ERP background colour
+            col = obj.colourByLabel(val);
+            set(obj.h_channels_subplots(idx), 'color', col)
+        end
+        
+        function col = colourByLabel(~, label)
+            switch label
+                case 'Double peak'
+                    col = [.7, .7, 1];
+                case 'Peaks not clear'
+                    col = [1, .7, .7];
+                case 'Other (needs checking)'
+                    col = [1, 1, .7];
+                otherwise
+                    col = [1, 1, 1];
+            end
+        end
+        
+        function metadataChanged(obj, varargin)
+            obj.prMetadataDirty = true;
         end
         
         function busy(obj, msg)
@@ -869,7 +972,7 @@ classdef tePeakFinder < handle
                 set(obj.h_inspector, 'enable', 'off')
             end
             if exist('msg', 'var'), obj.wb = waitbar(0, msg); end
-            drawnow
+%             drawnow
         end
 
         function notBusy(obj)
@@ -879,7 +982,7 @@ classdef tePeakFinder < handle
                 set(obj.h_inspector, 'enable', 'on')
             end
             if ishandle(obj.wb), delete(obj.wb), end
-            drawnow
+%             drawnow
         end 
     
     end

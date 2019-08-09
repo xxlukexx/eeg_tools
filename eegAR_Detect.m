@@ -173,7 +173,7 @@ function data = eegAR_Detect(data, varargin)
                 error('maxr2 value must be positive numeric scalar < 1.')
             end     
             % defaults
-            blinkLen = 0.100;
+            blinkLen = 0.050;
 
         otherwise 
             error('Unknown method. See help for a list of valid methods.')
@@ -199,10 +199,9 @@ function data = eegAR_Detect(data, varargin)
         % BP filter 0.1-15Hz for blinks
         cfg = [];
         cfg.bpfilter = 'yes';
-        cfg.bpfreq = [1, 15];
+        cfg.bpfreq = [3, 10];
         cfg.bpfiltorder = 4;
-        data_blink = data;
-%         data_blink = ft_preprocessing(cfg, data);   
+        data_blink = ft_preprocessing(cfg, data);   
         % compute channel zscores for each trial
         wb = waitbar(0, wb, 'Pre-computing EOG stats...');
         zdata = eegZScoreSegs(data_blink);
@@ -226,6 +225,9 @@ function data = eegAR_Detect(data, varargin)
         end
         
         % loop through trials
+%         nsp = numSubplots(16);
+%         spc = 1;
+%         fig = figure('visible', 'off');
         for tr = 1:numTrials
 
             % convert time range from secs to samples, clamp to trial
@@ -253,15 +255,26 @@ function data = eegAR_Detect(data, varargin)
                         len = ct(:, 3) / data.fsample;
                         blink(ch, tr) = any(len > blinkLen);
                     end             
+%                     % fit gaussian to blinks
+%                     [ft, gof] =...
+%                         fit(data_blink.time{tr}', data_blink.trial{tr}(ch, :)', 'gauss2');
+%                     subplot(nsp(1), nsp(2), spc)
+%                     spc = spc + 1;
+%                     plot(data_blink.time{tr}, data_blink.trial{tr}(ch, :))
+%                     hold on
+%                     plot(ft)
+%                     title(num2str(gof.rsquare))
+%                     fprintf('Trial %d\n', tr)
                     % detect drift
                     if ~blink(ch, tr)
                         [~, gof] = fit(data.time{tr}', seg', 'poly2');
-                        drift(ch, tr) = gof.rsquare >= .6;
+                        drift(ch, tr) = gof.rsquare >= .65;
                     end
                     mat(ch, tr) = blink(ch, tr) || drift(ch, tr);
             end
 
         end
+%         set(fig, 'visible', 'on')
 
     end
     

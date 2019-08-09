@@ -3,6 +3,8 @@ function smry = eegAR_Summarise(data, smry)
     % art = eegAR_Summarise(data, art)
     %
     % Summary statistics about artefact detection. 
+    numTrials = size(data.art, 2);
+    numChannels = size(data.art, 1);
     
     % combos - trial x channel combinations
     anyArt = any(data.art, 3);
@@ -13,17 +15,21 @@ function smry = eegAR_Summarise(data, smry)
     
     % trials 
     trArt = any(anyArt, 1);
+    smry.trials.marks = trArt;
     smry.trials.total = length(trArt);
     smry.trials.good = sum(~trArt);
     smry.trials.bad = sum(trArt);
     smry.trials.propGood = smry.trials.good / smry.trials.total;
+    smry.trials.channelProp = sum(anyArt, 1) ./ numChannels;
     
     % channels
     chArt = any(anyArt, 2);
+    smry.channels.marks = chArt;
     smry.channels.total = length(chArt);
     smry.channels.good = sum(~chArt);
     smry.channels.bad = sum(chArt);
     smry.channels.propGood = smry.channels.good / smry.channels.total;
+    smry.channels.trialProp = sum(anyArt, 2) ./ numTrials;
         
     % breakdown by event
     if isfield(data, 'trialinfo')
