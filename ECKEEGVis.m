@@ -161,6 +161,11 @@ classdef ECKEEGVis < handle
         privPTBOldSyncTests
         privPTBOldWarningFlag
         privStat
+        privTimer
+        privLastMouseX
+        privLastMouseY
+        privLastMouseButtons
+        privLastKeyDown
     end
     
     properties (Dependent)
@@ -240,7 +245,13 @@ classdef ECKEEGVis < handle
                 obj.Data = data_in;
                 obj.StartInteractive
             end
-        
+            
+            % init timer
+            obj.privTimer = timer(...
+                'Period', round(1000 / 60) / 1000,...
+                'ExecutionMode', 'fixedDelay',...
+                'TimerFcn', @obj.Update);
+            
         end
         
         % destructor
@@ -1020,215 +1031,217 @@ classdef ECKEEGVis < handle
             
             % capture keyboard
             ListenChar(2)
-            keyDown = false;
-            mx = 0;
-            my = 0;
-            mButtons = [];
+            obj.privLastKeyDown = false;
+            obj.privLastMouseX = 0;
+            obj.privLastMouseY = 0;
+            obj.privLastMouseButtons = [];
             
-            stop = false;
-            while ~stop
-                
-                reDrawNeeded = false;
-                
-                % poll keyboard
-                lastKeyDown = keyDown;
-                [keyDown, ~, keyCode] = KbCheck(-1);
-                
-                % check for multiple keys - not supported right now
-                if sum(keyCode) > 1
-                    pos = find(keyCode, 1, 'first');
-                    keyCode = false(size(keyCode));
-                    keyCode(pos) = true;
+            start(obj.privTimer)
+            
+            % release keyboard
+            ListenChar
+            
+        end
+        
+        function Update(obj, ~, ~)
+                           
+            reDrawNeeded = false;
+
+            % poll keyboard
+            [keyDown, ~, keyCode] = KbCheck(-1);
+
+            % check for multiple keys - not supported right now
+            if sum(keyCode) > 1
+                pos = find(keyCode, 1, 'first');
+                keyCode = false(size(keyCode));
+                keyCode(pos) = true;
+            end
+
+            % poll mouse
+            [mx, my, mButtons] = GetMouse(obj.privWinPtr);
+
+            % process mouse movement
+            if mx ~= obj.privLastMouseX && my ~= obj.privLastMouseY
+
+                % find highlighted channel
+                lChanHover = obj.privChanHover;
+                obj.privChanHover = find(...
+                    mx >= obj.privChanX + obj.privDrawOffset(1) &...
+                    mx <= obj.privChanX + obj.privChanW + obj.privDrawOffset(1) &...
+                    my >= obj.privChanY + obj.privDrawOffset(2) &...
+                    my <= obj.privChanY + obj.privChanH + obj.privDrawOffset(2),...
+                    1, 'first');
+                % check for multiple channels selected - for now, fix
+                % this by taking the first. In future this should take
+                % the NEAREST
+                if length(obj.privChanHover) > 1
+                    obj.privChanHover = obj.privChanHover(1);
                 end
-                
-                % poll mouse
-                lmx = mx;
-                lmy = my;
-                lmButtons = mButtons;
-                [mx, my, mButtons] = GetMouse(obj.privWinPtr);
-                
-                % process mouse movement
-                if mx ~= lmx && my ~= lmy
-                    
-                    % find highlighted channel
-                    lChanHover = obj.privChanHover;
-                    obj.privChanHover = find(...
-                        mx >= obj.privChanX + obj.privDrawOffset(1) &...
-                        mx <= obj.privChanX + obj.privChanW + obj.privDrawOffset(1) &...
-                        my >= obj.privChanY + obj.privDrawOffset(2) &...
-                        my <= obj.privChanY + obj.privChanH + obj.privDrawOffset(2),...
-                        1, 'first');
-                    % check for multiple channels selected - for now, fix
-                    % this by taking the first. In future this should take
-                    % the NEAREST
-                    if length(obj.privChanHover) > 1
-                        obj.privChanHover = obj.privChanHover(1);
-                    end
-                    if ~isequal(obj.privChanHover, lChanHover)
-                        reDrawNeeded = true;
-                    end
-                    
-                    % find cursor pos on time series within channel
-                    if ~isempty(obj.privChanHover)
-                        obj.privChanHoverCursorX = mx;
+                if ~isequal(obj.privChanHover, lChanHover)
+                    reDrawNeeded = true;
+                end
+
+                % find cursor pos on time series within channel
+                if ~isempty(obj.privChanHover)
+                    obj.privChanHoverCursorX = mx;
 %                         obj.privChanHoverCursorY =...
 %                             obj.privChanY(obj.privChanHover);
-                        obj.privChanHoverCursorVisible = true;
-                        reDrawNeeded = true;
-                    else
-                        obj.privChanHoverCursorVisible = true;
-                    end
-                        
+                    obj.privChanHoverCursorVisible = true;
+                    reDrawNeeded = true;
+                else
+                    obj.privChanHoverCursorVisible = true;
                 end
-                
-                % process mouse clicks
-                if ~isequal(lmButtons, mButtons) && ~keyDown
-                    
-                    % toggle artefact flag on single channel on current trial
-                    if mButtons(1) && ~isempty(obj.privChanHover)
-                        % get current artefact status
-                        curArt = obj.privData.art(obj.privChanHover, obj.privTrial, obj.privArtLayer);
-                        switch curArt
-                            case false  % not current art, mark as art
+
+            end
+
+            % process mouse clicks
+            if ~isequal(obj.privLastMouseButtons, mButtons) && ~keyDown
+
+                % toggle artefact flag on single channel on current trial
+                if mButtons(1) && ~isempty(obj.privChanHover)
+                    % get current artefact status
+                    curArt = obj.privData.art(obj.privChanHover, obj.privTrial, obj.privArtLayer);
+                    switch curArt
+                        case false  % not current art, mark as art
 %                                 obj.privData.artType{obj.privChanHover, obj.privTrial} = 'Manual';
-                                obj.privData.art(obj.privChanHover, obj.privTrial, obj.privArtLayer) = true;
-                            case true   % is currently art, mark as not art
+                            obj.privData.art(obj.privChanHover, obj.privTrial, obj.privArtLayer) = true;
+                        case true   % is currently art, mark as not art
 %                                 obj.privData.artType{obj.privChanHover, obj.privTrial} = [];                              
-                                obj.privData.art(obj.privChanHover, obj.privTrial, obj.privArtLayer) = false;
-                        end
+                            obj.privData.art(obj.privChanHover, obj.privTrial, obj.privArtLayer) = false;
+                    end
 %                         obj.Art(obj.privChanHover, obj.privTrial) =...
 %                             ~obj.Art(obj.privChanHover, obj.privTrial);
-                        reDrawNeeded = true;
-                    end
-                    
+                    reDrawNeeded = true;
+                end
+
 %                     % if cmd key is held down, toggle artefact flag for
 %                     % current channel for all trials
-%                     if lastKeyDown && keyDown &&...
+%                     if obj.privLastKeyDown && keyDown &&...
 %                             strmpi(KbName(keyCode), 'LeftGUI') &&...
 %                             mButtons(1) && ~isempty(obj.privChanHover)
 %                         obj.Art(obj.privChanHover, :) =...      
 %                             ~obj.Art(obj.privChanHover, :);
 %                     end
-                    
-                end
-                    
-                % process keys
-                if ~lastKeyDown && keyDown
-                    % a single keypress (as opposed to holding a key down)
-                    % has been made    
-                    switch KbName(keyCode)
-                        case 'RightArrow'   % next trial
-                            obj.privTrial = obj.privTrial + 1;
-                            if obj.privTrial > obj.privNumTrials
-                                obj.privTrial = obj.privNumTrials;
-                            end
-                            obj.PrepareForDrawing
-                            reDrawNeeded = true;
-                        case 'LeftArrow'    % prev trial
-                            obj.privTrial = obj.privTrial - 1;
-                            if obj.privTrial < 1
-                                obj.privTrial = 1;
-                            end
-                            obj.PrepareForDrawing
-                            reDrawNeeded = true;
-                        case 'UpArrow'      % increase amplitude scale
-                            obj.AutoSetTrialYLim = false;                              
-                            obj.YLim = obj.YLim * .75;
-                        case 'DownArrow'    % increase amplitude scale
-                            obj.AutoSetTrialYLim = false;
-                            obj.YLim = obj.YLim * (1 / .75);
-                        case 'y'            % auto amplitude scale
-                            obj.AutoSetTrialYLim = ~obj.AutoSetTrialYLim;
-                        case 'f'            % toggle fullscreen
-                            obj.Fullscreen = ~obj.Fullscreen;
-                        case '=+'           % zoom in
-                            obj.Zoom = 1.25;
-                        case '-_'           % zoom out
-                            obj.Zoom = .8;
-                        case 'a'            % mark all art
-                            if ~all(obj.privData.art(:, obj.privTrial, obj.privArtLayer))
+
+            end
+
+            % process keys
+            if ~obj.privLastKeyDown && keyDown
+                % a single keypress (as opposed to holding a key down)
+                % has been made    
+                switch KbName(keyCode)
+                    case 'RightArrow'   % next trial
+                        obj.privTrial = obj.privTrial + 1;
+                        if obj.privTrial > obj.privNumTrials
+                            obj.privTrial = obj.privNumTrials;
+                        end
+                        obj.PrepareForDrawing
+                        reDrawNeeded = true;
+                    case 'LeftArrow'    % prev trial
+                        obj.privTrial = obj.privTrial - 1;
+                        if obj.privTrial < 1
+                            obj.privTrial = 1;
+                        end
+                        obj.PrepareForDrawing
+                        reDrawNeeded = true;
+                    case 'UpArrow'      % increase amplitude scale
+                        obj.AutoSetTrialYLim = false;                              
+                        obj.YLim = obj.YLim * .75;
+                    case 'DownArrow'    % increase amplitude scale
+                        obj.AutoSetTrialYLim = false;
+                        obj.YLim = obj.YLim * (1 / .75);
+                    case 'y'            % auto amplitude scale
+                        obj.AutoSetTrialYLim = ~obj.AutoSetTrialYLim;
+                    case 'f'            % toggle fullscreen
+                        obj.Fullscreen = ~obj.Fullscreen;
+                    case '=+'           % zoom in
+                        obj.Zoom = 1.25;
+                    case '-_'           % zoom out
+                        obj.Zoom = .8;
+                    case 'a'            % mark all art
+                        if ~all(obj.privData.art(:, obj.privTrial, obj.privArtLayer))
 %                                 obj.privData.artType(:, obj.privTrial) =...
 %                                     repmat({'Manual'}, obj.privNumChannels, 1);
-                                obj.privData.art(:, obj.privTrial, obj.privArtLayer) = true;
-                            else
-                                obj.privData.art(:, obj.privTrial, obj.privArtLayer) = false;
-                            end
-                            reDrawNeeded = true;
-                        case 'n'            % mark none art
+                            obj.privData.art(:, obj.privTrial, obj.privArtLayer) = true;
+                        else
                             obj.privData.art(:, obj.privTrial, obj.privArtLayer) = false;
-                        case 'c'            % centre display
-                            obj.privDrawSize = obj.privWindowSize;
-                            obj.privZoom = 1;
-                            obj.privChanHover = [];
-                            obj.privChanHoverCursorVisible = false;
-                            obj.PrepareForDrawing;
+                        end
+                        reDrawNeeded = true;
+                    case 'n'            % mark none art
+                        obj.privData.art(:, obj.privTrial, obj.privArtLayer) = false;
+                    case 'c'            % centre display
+                        obj.privDrawSize = obj.privWindowSize;
+                        obj.privZoom = 1;
+                        obj.privChanHover = [];
+                        obj.privChanHoverCursorVisible = false;
+                        obj.PrepareForDrawing;
+                        reDrawNeeded = true;
+                    case ',<'           % prev history
+                        hIdx = obj.privArtHistoryIdx - 1;
+                        if hIdx > 1 
+                            obj.privArtHistoryIdx = hIdx;
+                            obj.privData.art =...
+                                obj.privArtHistory{hIdx};
                             reDrawNeeded = true;
-                        case ',<'           % prev history
-                            hIdx = obj.privArtHistoryIdx - 1;
-                            if hIdx > 1 
-                                obj.privArtHistoryIdx = hIdx;
-                                obj.privData.art =...
-                                    obj.privArtHistory{hIdx};
-                                reDrawNeeded = true;
-                            end
-                        case '.>'           % next history
-                            hIdx = obj.privArtHistoryIdx + 1;
-                            if hIdx <= length(obj.privArtHistory) &&...
-                                    ~isempty(obj.privArtHistory(hIdx))
-                                obj.privArtHistoryIdx = hIdx;
-                                obj.privData.art =...
-                                    obj.privArtHistory{hIdx};
-                                reDrawNeeded = true;
-                            end
-                        case 'ESCAPE'       % stop
-                            obj.privChanHover = [];
-                            obj.privChanHoverCursorVisible = false;
-                            if obj.Fullscreen &&...
-                                    all(Screen('Screens') == 0) 
-                                obj.Fullscreen = false;
-                            end
+                        end
+                    case '.>'           % next history
+                        hIdx = obj.privArtHistoryIdx + 1;
+                        if hIdx <= length(obj.privArtHistory) &&...
+                                ~isempty(obj.privArtHistory(hIdx))
+                            obj.privArtHistoryIdx = hIdx;
+                            obj.privData.art =...
+                                obj.privArtHistory{hIdx};
                             reDrawNeeded = true;
-                            stop = true;
-                    end
-                elseif lastKeyDown && keyDown
-                    % a key has been held down
-                    switch KbName(keyCode)
-                        case 'LeftControl'      % pan
-                            if mButtons(1)
-                                obj.privIsPanning = true;
-                                % calculate delta
-                                if ~isempty(lmx)
-                                    mdx = lmx - mx;
-                                    mdy = lmy - my;
-                                    obj.privDrawSize = obj.privDrawSize -...
-                                        [mdx, mdy, mdx, mdy];
-                                    obj.UpdateDrawSize
-                                    obj.PrepareForDrawing;
-                                    reDrawNeeded = true;
-                                end
-                            end
-                        case 'LeftGUI'          % mark/unmark all
-                            if ~lmButtons(1) && mButtons(1) &&...
-                                    ~isempty(obj.privChanHover)
-                                if ~all(obj.privData.art(obj.privChanHover, :, obj.privArtLayer))
-                                    obj.privData.art(obj.privChanHover, :, obj.privArtLayer) = true;  
-                                else
-                                    obj.privData.art(obj.privChanHover, :, obj.privArtLayer) = false;  
-                                end
-                            end
-                    end
-                elseif lastKeyDown && ~keyDown
-                    % key has been released
-                    if obj.privIsPanning, obj.privIsPanning = false; end
+                        end
+                    case 'ESCAPE'       % stop
+                        obj.privChanHover = [];
+                        obj.privChanHoverCursorVisible = false;
+                        if obj.Fullscreen &&...
+                                all(Screen('Screens') == 0) 
+                            obj.Fullscreen = false;
+                        end
+                        reDrawNeeded = true;
+                        stop(obj.privTimer)
                 end
-                
-                if reDrawNeeded, obj.Draw, end
-                
+            elseif obj.privLastKeyDown && keyDown
+                % a key has been held down
+                switch KbName(keyCode)
+                    case 'LeftControl'      % pan
+                        if mButtons(1)
+                            obj.privIsPanning = true;
+                            % calculate delta
+                            if ~isempty(obj.privLastMouseX)
+                                mdx = obj.privLastMouseX - mx;
+                                mdy = obj.privLastMouseY - my;
+                                obj.privDrawSize = obj.privDrawSize -...
+                                    [mdx, mdy, mdx, mdy];
+                                obj.UpdateDrawSize
+                                obj.PrepareForDrawing;
+                                reDrawNeeded = true;
+                            end
+                        end
+                    case 'LeftGUI'          % mark/unmark all
+                        if ~obj.privLastMouseButtons(1) && mButtons(1) &&...
+                                ~isempty(obj.privChanHover)
+                            if ~all(obj.privData.art(obj.privChanHover, :, obj.privArtLayer))
+                                obj.privData.art(obj.privChanHover, :, obj.privArtLayer) = true;  
+                            else
+                                obj.privData.art(obj.privChanHover, :, obj.privArtLayer) = false;  
+                            end
+                        end
+                end
+            elseif obj.privLastKeyDown && ~keyDown
+                % key has been released
+                if obj.privIsPanning, obj.privIsPanning = false; end
             end
+
+            if reDrawNeeded, obj.Draw, end
             
-            % release keyboard
-            ListenChar
-            
+            obj.privLastMouseX = mx;
+            obj.privLastMouseY = my;
+            obj.privLastMouseButtons = mButtons;
+            obj.privLastKeyDown = keyDown;
+
         end
         
         % property get/set            
