@@ -49,6 +49,7 @@ function [data_ft, smry] = eegFT_correctFromLightSensor(...
         adelta = abs(delta);
         idx = adelta < tol;
         
+        % if not matches within tolerance for this event, move to the next
         if ~any(idx), continue, end
         
         % if more than on light marker was in range of the ft event, take
@@ -76,10 +77,17 @@ function [data_ft, smry] = eegFT_correctFromLightSensor(...
         % correct
         tab.sample(e) = mrk_light(idx);
         
+        % measure correction
+        
+        
     end
 
     % rebuild events struct from table
     data_ft.events = table2struct(tab);
+    
+    % optionally return summary
+    if nargout == 2
+    end
     smry.found = true;
     
 end

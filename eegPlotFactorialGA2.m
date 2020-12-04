@@ -17,6 +17,7 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
     addParameter(   parser, 'plotSEM',              true,       @islogical      )
     addParameter(   parser, 'SEMAlpha',             .1,         @isnumeric      )
     addParameter(   parser, 'colMap',               @lines                      )
+    addParameter(   parser, 'colours',              [],         @isnumeric      )
     addParameter(   parser, 'linewidth',            1.5,        @isnumeric      )
     addParameter(   parser, 'fontsize',             10,         @isnumeric      )
     addParameter(   parser, 'mawidth',              .040,       @isnumeric      )    
@@ -31,6 +32,10 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
     addParameter(   parser, 'detrend',              false,      @islogical      )
     addParameter(   parser, 'colOrder',             [],         @islogical      )
     addParameter(   parser, 'rowOrder',             [],         @islogical      )
+    addParameter(   parser, 'xgrid',                true,       @islogical      )
+    addParameter(   parser, 'ygrid',                true,       @islogical      )
+    addParameter(   parser, 'xlabel',               'Time (s)', @ischar         )
+    addParameter(   parser, 'ylabel',               'Amplitude (µV)',@ischar    )
     parse(          parser, tab, component, varargin{:});
     tab         =   parser.Results.tab;
     component   =   parser.Results.comp;
@@ -44,6 +49,7 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
     plotSEM     =   parser.Results.plotSEM;
     SEMAlpha    =   parser.Results.SEMAlpha;
     colMap      =   parser.Results.colMap;
+    colours      =   parser.Results.colours;
     linewidth   =   parser.Results.linewidth;
     fontsize    =   parser.Results.fontsize;
     mawidth     =   parser.Results.mawidth;
@@ -56,6 +62,10 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
     doTTest     =   parser.Results.ttest;
     doDeTrend   =   parser.Results.detrend;
     doTable     =   parser.Results.makeTable;
+    xgrid       =   parser.Results.xgrid;
+    ygrid       =   parser.Results.ygrid;    
+    xlab        =   parser.Results.xlabel;   
+    ylab        =   parser.Results.ylabel;  
     
     % axes line width is one thinner than line width
     axLineWidth = linewidth - 1;
@@ -331,7 +341,6 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
     if isempty(fig_erp)
         fig_erp = figure('name', name, 'defaultaxesfontsize', fontsize);
     else
-        clf
         set(fig_erp, 'defaultaxesfontsize', fontsize);
     end
 
@@ -341,13 +350,19 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
     for row = 1:numRow
         for col = 1:numCol
             
-            subplot(numRow, numCol, spIdx);
-            spIdx = spIdx + 1;
+            if numRow > 1 || numCol > 1
+                sp = subplot(numRow, numCol, spIdx);
+                spIdx = spIdx + 1;
+            end
             
-            arCol = feval(colMap, numComp);
+            if isempty(colours)
+                arCol = feval(colMap, numComp);
+            else
+                arCol = colours;
+            end
             
             % legend
-            if isnumeric(comp_u)
+            if isnumeric(comp_u) || islogical(comp_u)
                 uCompStr = num2str(comp_u);
             else
                 uCompStr = comp_u;
@@ -401,15 +416,21 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
             text(0.5, 0.025, 'Shaded areas +/- 2 SEM', 'units',...
                 'normalized', 'horizontalalignment', 'center',...
                 'verticalalignment', 'bottom', 'color', [.4, .4, .4])
-            xlabel('Time (s)')
-            ylabel('Amplitude (uV)')
-            set(gca, 'xgrid', 'on')
-            set(gca, 'xminorgrid', 'on')
-            set(gca, 'ygrid', 'on')
+            xlabel(xlab)
+            ylabel(ylab)
+            if xgrid
+                set(gca, 'xgrid', 'on')
+                set(gca, 'xminorgrid', 'on')
+            end
+            if ygrid
+                set(gca, 'ygrid', 'on')
+            end
             set(gca, 'ylim', [min(avg(:)) - 1, max(avg(:)) + 1]);
             ax = gca;
             ax.XRuler.Axle.LineWidth = axLineWidth;
             ax.YRuler.Axle.LineWidth = axLineWidth;
+            
+            lm_removePhantomLegends(gcf)
             
         end
     end
@@ -456,7 +477,7 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
                 set(gca, 'xtick', 1:numComp)
                 set(gca, 'xticklabel', comp_u)
                 xlabel(compare, 'Interpreter', 'none')
-                ylabel('Mean Amplitude (uV)')
+                ylabel(ylab)
                 title(str)
                 set(gca, 'ylim', yl);
                 ax = gca;
@@ -543,7 +564,7 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
                 
                 % settings
                 xlabel(compare)
-                ylabel('Amplitude (µV)')
+                ylabel(ylab)
                 set(gca, 'XTickLabel', comp_u)
                 if numCol > 1 || numRow > 1
                     title(sprintf('Amplitude: %s', titleStr{row, col}))
@@ -568,29 +589,33 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
                     
                     % get data, make histogram
                     m = cell2mat(meanamp(comp, row, col));
+%                     histspline(m, 'linewidth', linewidth)
+                    histgauss(m, 'linewidth', linewidth)
+
                     
-                    [vals, edges, ~] =...
-                        histcounts(m, binSize, 'Normalization', 'probability');                     
-                    bar(edges(2:end), vals, 1, 'EdgeColor', 'none', 'FaceAlpha', .4);
-                    hold on
                     
-                    [vals, edges, ~] =...
-                        histcounts(m, hist_smooth, 'Normalization', 'probability');                    
-                    edges = edges(2:end) - (edges(2)-edges(1))/2;
-                    
-                    % fit gaussian 
-                    [f, ~] = fit(edges', vals', 'gauss1');
-                    
-                    % plot
-                    set(gca, 'colororderindex', comp)
-                    plot(edges, f(edges), 'LineWidth', linewidth)
+%                     [vals, edges, ~] =...
+%                         histcounts(m, binSize, 'Normalization', 'probability');                     
+%                     bar(edges(2:end), vals, 1, 'EdgeColor', 'none', 'FaceAlpha', .4);
+%                     hold on
+%                     
+%                     [vals, edges, ~] =...
+%                         histcounts(m, hist_smooth, 'Normalization', 'probability');                    
+%                     edges = edges(2:end) - (edges(2)-edges(1))/2;
+%                     
+%                     % fit gaussian 
+%                     [f, ~] = fit(edges', vals', 'gauss1');
+%                     
+%                     % plot
+%                     set(gca, 'colororderindex', comp)
+%                     plot(edges, f(edges), 'LineWidth', linewidth)
                     
                 end
                 
 %                 legend(comp_u)
                 
                 % settings
-                xlabel('Mean Amplitude (uV)')
+                xlabel(ylab)
                 ylabel('Probability')
                 set(gca, 'YTick', [])
                 if numCol > 1 || numRow > 1
@@ -653,22 +678,22 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
                     
                     % get data, make histogram
                     m = cell2mat(lat(comp, row, col));
-                    
-                    [vals, edges, ~] =...
-                        histcounts(m, binSize, 'Normalization', 'probability');                     
-                    bar(edges(2:end), vals, 1, 'EdgeColor', 'none', 'FaceAlpha', .4);
-                    hold on
-                    
-                    [vals, edges, ~] =...
-                        histcounts(m, hist_smooth, 'Normalization', 'probability');                    
-                    edges = edges(2:end) - (edges(2)-edges(1))/2;
-                    
-                    % fit gaussian 
-                    [f, ~] = fit(edges', vals', 'gauss1');
-                    
-                    % plot
-                    set(gca, 'colororderindex', comp)
-                    plot(edges, f(edges), 'LineWidth', linewidth)
+                    histgauss(m, 'linewidth', linewidth)
+%                     [vals, edges, ~] =...
+%                         histcounts(m, binSize, 'Normalization', 'probability');                     
+%                     bar(edges(2:end), vals, 1, 'EdgeColor', 'none', 'FaceAlpha', .4);
+%                     hold on
+%                     
+%                     [vals, edges, ~] =...
+%                         histcounts(m, hist_smooth, 'Normalization', 'probability');                    
+%                     edges = edges(2:end) - (edges(2)-edges(1))/2;
+%                     
+%                     % fit gaussian 
+%                     [f, ~] = fit(edges', vals', 'gauss1');
+%                     
+%                     % plot
+%                     set(gca, 'colororderindex', comp)
+%                     plot(edges, f(edges), 'LineWidth', linewidth)
                     
                 end
                 
@@ -784,29 +809,33 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
     set(gcf, 'Color', [1, 1, 1])
     hold off
     
-    tightfig(fig_erp)
-    tilefigs
+    if isa(fig_erp, 'matlab.ui.Figure')
+        tightfig(fig_erp)
+        tilefigs
     
-%     tightfig(fig_hist_amp)
-%     tightfig(fig_hist_lat)
-        
-    fig_bp_amp.Position(3) = 400;
-    fig_bp_lat.Position(3) = 400;
-    fig_b2bhist.Position(3) = 461;
-    fig_b2bhist.Position(4) = 600;
-    fig_hist2.Position(3) = 461;
-    fig_hist2.Position(4) = 600;
-    fig_erp.Position(3) = 600;
-    fig_erp.Position(4) = 450;
-        
-    fig_erp.Position(3) = 1500;
-    fig_erp.Position(4) = 535;
+    %     tightfig(fig_hist_amp)
+    %     tightfig(fig_hist_lat)
+
+        fig_bp_amp.Position(3) = 400;
+        fig_bp_lat.Position(3) = 400;
+        fig_b2bhist.Position(3) = 461;
+        fig_b2bhist.Position(4) = 600;
+        fig_hist2.Position(3) = 461;
+        fig_hist2.Position(4) = 600;
+        fig_erp.Position(3) = 600;
+        fig_erp.Position(4) = 450;
+
+        fig_erp.Position(3) = 1500;
+        fig_erp.Position(4) = 535;
+
+        if plotHist
+            fig_hist_amp.Position(3) = 730;
+            fig_hist_amp.Position(4) = 370 * numRow;
+            fig_hist_lat.Position(3) = 730;
+            fig_hist_lat.Position(4) = 370 * numRow;        
+        end
+
     
-    if plotHist
-        fig_hist_amp.Position(3) = 730;
-        fig_hist_amp.Position(4) = 370 * numRow;
-        fig_hist_lat.Position(3) = 730;
-        fig_hist_lat.Position(4) = 370 * numRow;        
     end
     
 end

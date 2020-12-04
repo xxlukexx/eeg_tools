@@ -177,7 +177,7 @@ if acc
     end
 end
 
-if ~isempty(channels_selected)
+if exist('channels_selected', 'var') && ~isempty(channels_selected)
     channels_selected = sort(str2double(channels_selected));
     NChannels = length(channels_selected);
     ChannelList = cat(1,ChannelList(channels_selected));
@@ -276,7 +276,17 @@ if ~isempty(Triggers)
             tab_trig = readtable(file_lookup);
             % check size of lookup table against events read from .easy
             % file
-            if size(tab_trig, 1) ~= length(type)
+            if size(tab_trig, 1) > length(type)
+                warning('Lookup file (%s) has %d events, .easy file (%s) has %d events. I will take the first %d events from the lookup file, but you should check the results carefully to make sure they match up correctly.',...
+                    file_lookup, size(tab_trig, 1), EEG.filepath, length(type), length(type))     
+                tab_trig = tab_trig(1:length(type), :);
+            elseif size(tab_trig, 1) < length(type)
+                warning('Lookup file (%s) has %d events, .easy file (%s) has %d events. I will take the first %d events from the easy file, but you should check the results carefully to make sure they match up correctly.',...
+                    file_lookup, size(tab_trig, 1), EEG.filepath, length(type), length(type))                    
+                type = type(1:size(tab_trig, 1), :);
+                lat = lat(1:size(tab_trig, 1), :);
+                lat_ms = lat_ms(1:size(tab_trig, 1), :);
+            elseif size(tab_trig, 1) ~= length(type)
                 error('Lookup file (%s) has %d events, .easy file (%s) has %d events - mistmatch.',...
                     file_lookup, size(tab_trig, 1), EEG.filepath, length(type))
             end

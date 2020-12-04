@@ -31,7 +31,8 @@ function [found, mrk_samps, mrk_time, idx_chan] =...
 
 % look for channel
 
-    [anyFound, idx_chan] = eegFT_findLightSensorChannel(ft_data, thresh);
+    [anyFound, idx_chan, ~, ft_data] =...
+        eegFT_findLightSensorChannel(ft_data, thresh);
     if ~anyFound
         found = false;
         mrk_samps = [];

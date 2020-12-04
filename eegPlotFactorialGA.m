@@ -106,8 +106,10 @@ function fig = eegPlotFactorialGA(tab, time, comp, varargin)
     peakamp = cell(numComp, numRow, numCol);
     meanamp = cell(numComp, numRow, numCol);
     sdamp = cell(numComp, numRow, numCol);
-    freq = zeros(size(tab.freq{1}, 1), size(tab.freq{1}, 2), numComp,...
-        numRow, numCol);
+    if plotERO
+        freq = zeros(size(tab.freq{1}, 1), size(tab.freq{1}, 2), numComp,...
+            numRow, numCol);
+    end
     
     for comp = 1:numComp
         for row = 1:numRow
@@ -148,13 +150,14 @@ function fig = eegPlotFactorialGA(tab, time, comp, varargin)
 %                         tmpSD(s1_samp:s2_samp);
                     
                     % ERSP
-                    tmpFreq = zeros(size(tab.freq{1}));
-                    found = find(idx);
-                    for a = 1:length(found)
-                        tmpFreq = tmpFreq + tab.freq{found(a)};
+                    if plotERO
+                        tmpFreq = zeros(size(tab.freq{1}));
+                        found = find(idx);
+                        for a = 1:length(found)
+                            tmpFreq = tmpFreq + tab.freq{found(a)};
+                        end
+                        freq(:, :, comp, row, col) = tmpFreq / sum(idx);
                     end
-                    freq(:, :, comp, row, col) = tmpFreq / sum(idx);
-                    
                 end
             end
         end

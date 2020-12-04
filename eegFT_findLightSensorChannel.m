@@ -1,8 +1,10 @@
-function [anyFound, idx_chan] = eegFT_findLightSensorChannel(ft_data, thresh)
+function [anyFound, idx_chan, reason, ft_data] = eegFT_findLightSensorChannel(ft_data, thresh)
 % attempts to find the channel containing light sensor data. Simple
 % approach is to look for voltage values that regularly exceed a certain
 % threshold - by default 1000µV (although 5000µV is more usual). Can be set
 % with the thresh input arg. 
+
+    reason = 'unknown error';
 
     try
         ft_defaults
@@ -18,14 +20,15 @@ function [anyFound, idx_chan] = eegFT_findLightSensorChannel(ft_data, thresh)
     
     % preprocess data
     cfg = [];
-%     cfg.hpfilt = 'yes';
-%     cfg.hpfreq = 0.1;
+    cfg.hpfilt = 'yes';
+    cfg.hpfreq = 1;
     cfg.detrend = 'yes';
+    cfg.demean = 'yes';
     ft_data = ft_preprocessing(cfg, ft_data);
     
     % set minimum number of contiguous samples above threshold that we
     % consider to be indicative of a light sensor turning on 
-    min_time = 0.020;
+    min_time = 0.015;
     min_samps = min_time * ft_data.fsample;
     
     % put all trials into one long matrix
