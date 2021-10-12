@@ -336,6 +336,15 @@ classdef tePeakFinder < handle
             obj.prMetadataDirty = val;
         end
         
+        function set.prTableUpdating(obj, val)
+            obj.prTableUpdating = val;
+            if val
+                fprintf('Table updating\n')
+            else
+                fprintf('Table not updating\n')
+            end
+        end
+        
     end
     
     methods %(Access = private)
@@ -519,9 +528,10 @@ classdef tePeakFinder < handle
                 end 
                 
             % label peak
-            text(mds.(md_lat) + .07, mds.(md_amp), sprintf('%.0fms',...
-                mds.(md_lat)* 1e3), 'parent', obj.h_channels_subplots(c));
-                
+            if isfield(mds, md_lat) && isfield(mds, md_amp)
+                text(mds.(md_lat) + .07, mds.(md_amp), sprintf('%.0fms',...
+                    mds.(md_lat)* 1e3), 'parent', obj.h_channels_subplots(c));
+            end                
                 
 %             % draw window
 %             
@@ -737,11 +747,13 @@ classdef tePeakFinder < handle
             if ~isempty(h.Indices)
                 idx_row = h.Indices(1);
             else
+                obj.prTableUpdating = false;
                 return
             end
             
             % if row has not changed, return
             if isequal(obj.prTableSelectedRow, idx_row)
+                obj.prTableUpdating = false;
                 return
             end
             
@@ -817,7 +829,7 @@ classdef tePeakFinder < handle
                 % check that all conditions in the peak def are present as
                 % fields in the ERP struct
                 expectedFields = unique(obj.PeakDefinition.condition);
-                if ~all(ismember(fieldnames(obj.SelectedData), expectedFields))
+                if ~all(ismember(expectedFields, fieldnames(obj.SelectedData)))
                     errordlg('Not all conditions present in ERP data.');
                     return
                 end

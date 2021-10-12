@@ -12,7 +12,7 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
     % data          -   fieldtrip data
     % art           -   artefact matrix, logical, [channels x trials]
     % distance      -   (optional) max distance to neighbouring electrodes
-    %                   for them to be be interpolated from (def. 50ms)
+    %                   for them to be be interpolated from (def. 50mm)
     % nb            -   (optional) fieldtrip neighbours structure. Will be
     %                   calculated if not supplied. Save time by passing a
     %                   previously used structure. 
@@ -65,11 +65,17 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
     
     % loop through trials
     numTr = size(data.trial, 2);
-    for tr = 1:numTr
+    tmp_trial = data.trial;
+    parfor tr = 1:numTr
+        
+        tmp_interpMat = interpMat(:, tr);
+        tmp_interpNeigh = interpNeigh(:, tr);
+        tmp_interp = interp(:, tr);
+        tmp_excl = excl(:, tr);
         
         % check that there are some channels with artefacts on this current
         % trial
-        if ~any(art.matrix(:, tr)), continue, end
+        if ~any(art.matrix(:, tr, :), 3), continue, end
         
         % select data from current trial
         cfg = [];
@@ -80,7 +86,7 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
         tmp = ft_selectdata(cfg, data_stripped);
         
         % extract channels with artefacts on this trial
-        bad = art.matrix(:, tr);
+        bad = any(art.matrix(:, tr, :), 3);
         
         % find non-bad neighbours
         [canInterp, canInterpLabs, canInterpNb, canInterpSmry] =...
@@ -93,23 +99,31 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
             
             % interpolate
             cfg = [];
-            cfg.method = 'spline';
+            cfg.method = 'weighted';
             cfg.badchannel = canInterpLabs;
             cfg.neighbours = canInterpNb;
             tmpi = ft_channelrepair(cfg, tmp);
-            interpMat(canInterp, tr) = true;
-            interpNeigh(canInterp, tr) = {canInterp};
+            tmp_interpMat(canInterp) = true;
+            tmp_interpNeigh(canInterp) = {canInterp};            
+%             interpMat(canInterp, tr) = true;
+%             interpNeigh(canInterp, tr) = {canInterp};
             
             % replace original trial data
-            data.trial{tr} = tmpi.trial{:};
+            tmp_trial{tr} = tmpi.trial{:};
             
             % update flags
-            interp(canInterp, tr) = true;
-            excl(bad & ~canInterp, tr) = true;
+            tmp_interp(canInterp) = true;
+            tmp_excl(bad & ~canInterp) = true;
             
         end
+        
+        interpMat(:, tr) = tmp_interpMat;
+        interpNeigh(:, tr) = tmp_interpNeigh;
+        interp(:, tr) = tmp_interp;
+        excl(:, tr) = tmp_excl;
 
     end
+    data.trial = tmp_trial;
     
     % summarise interpolation
     chanInterp = sum(interp, 2);                    % num channels with any trials interpolated

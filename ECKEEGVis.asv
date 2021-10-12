@@ -309,12 +309,6 @@ classdef ECKEEGVis < handle
             end
         end   
         
-        function SaveScreenshot(obj, file_out)
-            warning('not fully tested')
-            img = Screen('GetImage', obj.privWinPtr);
-            imwrite(img, file_out)
-        end
-        
         % data
         function UpdateData(obj)
             
@@ -533,7 +527,7 @@ classdef ECKEEGVis < handle
             
             % take electrode positions in layout file, normalise, convert
             % to pixels, make vectors for x, y, w and h coords
-            eegX = round(((-obj.privLayout.pos(:, 1)) + .5) * drW) +...
+            eegX = round((obj.privLayout.pos(:, 1) + .5) * drW) +...
                 obj.privDrawSize(1);
             eegY = round((obj.privLayout.pos(:, 2) + .5) * drH) +...
                 obj.privDrawSize(2);

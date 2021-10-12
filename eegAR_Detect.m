@@ -80,7 +80,14 @@ function data = eegAR_Detect(data, varargin)
 %                           will be detected (default 2.5)
 %       - maxr2         -   curve fits > maxr2 will be detected (default
 %                           R2 = 0.6)
-% 
+%
+%   step_voltage - detects a step/jump in sample-to-sample voltage above
+%   a criterion. 
+%
+%       - crit_voltage  -   step/jump > crit_voltage between any 
+%                           consecutive samples are marked as artefact
+%                           trials
+%
 % GENERAL PARAMETERS
 % In addition to specifying the method and associated paramters, there are
 % also general parameters that apply to all methods: 
@@ -94,7 +101,6 @@ function data = eegAR_Detect(data, varargin)
 %   - time_range        -   limit artefact detection to a particular time
 %                           range within each segment. 
 
-    wb = waitbar(0, 'Detecting artefacts...');
 
     %% parse inputs
     if ~exist('data', 'var') || isempty(data)
@@ -109,9 +115,10 @@ function data = eegAR_Detect(data, varargin)
     addParameter(   parser, 'method',                               @ischar  )
     addParameter(   parser, 'threshold',            [],             @isnumeric)
     addParameter(   parser, 'maxsd',                2.5,            @isnumeric)
-    addParameter(   parser, 'maxr2',                0.6,            @isnumeric)
+    addParameter(   parser, 'maxr2',                0.75,           @isnumeric)
     addParameter(   parser, 'excluded_channels',    []              )
     addParameter(   parser, 'time_range',           [-inf, inf]     )
+    addParameter(   parser, 'step_voltage',         inf             )
     parse(          parser, varargin{:});
     method          =   parser.Results.method;
     thresh          =   parser.Results.threshold;
@@ -119,10 +126,13 @@ function data = eegAR_Detect(data, varargin)
     maxr2           =   parser.Results.maxr2;
     chExcl          =   parser.Results.excluded_channels;
     trange          =   parser.Results.time_range;
+    step_volt       =   parser.Results.step_voltage;
 
     % get number of chans/trials
     numChans        = size(data.trial{1}, 1);
     numTrials       = length(data.trial);
+    
+    wb = waitbar(0, 'Detecting artefacts...');    
 
     % excluded channels
     if isempty(chExcl)
@@ -174,6 +184,12 @@ function data = eegAR_Detect(data, varargin)
             end     
             % defaults
             blinkLen = 0.050;
+           
+        case 'step'
+            % check param
+            if ~isnumeric(step_volt) || ~isscalar(step_volt) || step_volt < 0
+                error('step_voltage must be a positive numeric scalar.')
+            end
 
         otherwise 
             error('Unknown method. See help for a list of valid methods.')
@@ -205,7 +221,7 @@ function data = eegAR_Detect(data, varargin)
         % compute channel zscores for each trial
         wb = waitbar(0, wb, 'Pre-computing EOG stats...');
         zdata = eegZScoreSegs(data_blink);
-        zcrit = cellfun(@(x) x > maxsd, zdata.trial, 'uniform', false); 
+        zcrit = cellfun(@(x) abs(x) > maxsd, zdata.trial, 'uniform', false); 
         % separate matrices
         blink = false(numChans, numTrials);
         drift = false(numChans, numTrials);
@@ -245,7 +261,7 @@ function data = eegAR_Detect(data, varargin)
                 case 'range'
                     mat(ch, tr) = max(seg) - min(seg) >= thresh;            
                 case 'flat'
-                    mat(ch, tr) = all(seg < .0001);
+                    mat(ch, tr) = all(abs(seg) < .0001);
                 case 'alpha'
                     mat(ch, tr) = alpha_power_z(ch, tr) >= maxsd;
                 case 'eogstat'
@@ -267,10 +283,13 @@ function data = eegAR_Detect(data, varargin)
 %                     fprintf('Trial %d\n', tr)
                     % detect drift
                     if ~blink(ch, tr)
-                        [~, gof] = fit(data.time{tr}', seg', 'poly2');
-                        drift(ch, tr) = gof.rsquare >= .65;
+                        gof.rsquare = corr(data.time{tr}', seg') .^ 2;
+%                         [~, gof] = fit(data.time{tr}', seg', 'poly1');
+                        drift(ch, tr) = gof.rsquare >= maxr2;
                     end
                     mat(ch, tr) = blink(ch, tr) || drift(ch, tr);
+                case 'step'
+                    mat(ch, tr) = any(abs(diff(seg)) > step_volt);
             end
 
         end
