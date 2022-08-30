@@ -36,6 +36,8 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
     addParameter(   parser, 'ygrid',                true,       @islogical      )
     addParameter(   parser, 'xlabel',               'Time (s)', @ischar         )
     addParameter(   parser, 'ylabel',               'Amplitude (µV)',@ischar    )
+    addParameter(   parser, 'bgcolour',             [1, 1, 1],  @isnumeric)
+    addParameter(   parser, 'fgcolour',             [0, 0, 0],  @isnumeric)
     parse(          parser, tab, component, varargin{:});
     tab         =   parser.Results.tab;
     component   =   parser.Results.comp;
@@ -66,6 +68,8 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
     ygrid       =   parser.Results.ygrid;    
     xlab        =   parser.Results.xlabel;   
     ylab        =   parser.Results.ylabel;  
+    bgcol       =   parser.Results.bgcolour;
+    fgcol       =   parser.Results.fgcolour;
     
     % axes line width is one thinner than line width
     axLineWidth = linewidth - 1;
@@ -84,6 +88,7 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
         comp_s = ones(numData, 1);
         numComp = 1;
     else
+        tab = sortrows(tab, compare);
         if iscell(compare)
             numVars = length(compare);
             vComp = cell(size(tab, 1), numVars);
@@ -339,7 +344,7 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
     time_area = [time, fliplr(time)];
 
     if isempty(fig_erp)
-        fig_erp = figure('name', name, 'defaultaxesfontsize', fontsize);
+        fig_erp = figure('name', name, 'defaultaxesfontsize', fontsize, 'color', bgcol);
     else
         set(fig_erp, 'defaultaxesfontsize', fontsize);
     end
@@ -352,6 +357,7 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
             
             if numRow > 1 || numCol > 1
                 sp = subplot(numRow, numCol, spIdx);
+                sp.Color = bgcol;
                 spIdx = spIdx + 1;
             end
             
@@ -377,6 +383,7 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
                 
                 plot(time, dta, 'linewidth', linewidth,...
                         'color', arCol(arComp, :))
+                
             end         
             if numComp > 1 && plotSEM && showLegend, legend(uCompStr, 'Location', 'NorthEast'), end
             if numComp > 1 && ~plotSEM && showLegend, legend(uCompStr, 'Location', 'NorthEast'), end
@@ -409,7 +416,7 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
                 str = str(4:end);
             end
             
-            title(str)
+            h_title = title(str);
             titleStr{row, col} = str;
             
             % axis details
@@ -435,7 +442,20 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
         end
     end
     
-    set(gcf, 'Color', [1, 1, 1])
+    if ~isempty(bgcol)
+        set(gcf, 'Color', bgcol)
+        set(gca, 'color', bgcol);        
+        h_leg = findobj(gcf, 'type', 'legend');
+        h_leg.Color = bgcol;
+    end
+    
+    if ~isempty(fgcol)
+        set(gca, 'XColor', fgcol)
+        set(gca, 'YColor', fgcol)
+        set(h_title, 'color', fgcol)
+        h_leg = findobj(gcf, 'type', 'legend');
+        h_leg.TextColor = fgcol;
+    end
     
     %% boxplots
     if plotBoxPlot
@@ -555,9 +575,13 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
                 
                 [h_bar, h_errbar] = barwitherr(bar_sem, bar_mu);
                 h_bar.FaceColor = 'flat';
-                cols = lines(numComp);
+                if isempty(cols)
+                    cols_bar = lines(numComp);
+                else
+                    cols_bar = colours;
+                end
                 for cmp = 1:numComp
-                    h_bar.CData(cmp, :) = cols(cmp, :);
+                    h_bar.CData(cmp, :) = cols_bar(cmp, :);
                 end
                 h_bar.LineWidth = linewidth;
                 set(h_errbar, 'LineWidth', linewidth);
@@ -590,7 +614,7 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
                     % get data, make histogram
                     m = cell2mat(meanamp(comp, row, col));
 %                     histspline(m, 'linewidth', linewidth)
-                    histgauss(m, 'linewidth', linewidth)
+                    pl = histgauss(m, 'linewidth', linewidth, 'color', cols_bar(comp, :));
 
                     
                     
