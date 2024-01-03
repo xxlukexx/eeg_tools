@@ -99,7 +99,7 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
             
             % interpolate
             cfg = [];
-            cfg.method = 'weighted';
+            cfg.method = 'average';
             cfg.badchannel = canInterpLabs;
             cfg.neighbours = canInterpNb;
             tmpi = ft_channelrepair(cfg, tmp);

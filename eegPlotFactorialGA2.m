@@ -196,38 +196,40 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
     if doTTest && numComp ~= 2    
         warning('t-test not performed since num comparions ~= 2.')
     end
-        
-    res_t.lat_t = nan(numRow, numCol);
-    res_t.lat_p = nan(numRow, numCol);
-    res_t.lat_ci = nan(2, numRow, numCol);
-    res_t.lat_df = nan(numRow, numCol);
-    res_t.amp_t = nan(numRow, numCol);
-    res_t.amp_p = nan(numRow, numCol);
-    res_t.amp_ci = nan(2, numRow, numCol);
-    res_t.amp_df = nan(numRow, numCol);
+       
+    if doTTest || (doTable && numComp == 2)
+        res_t.lat_t = nan(numRow, numCol);
+        res_t.lat_p = nan(numRow, numCol);
+        res_t.lat_ci = nan(2, numRow, numCol);
+        res_t.lat_df = nan(numRow, numCol);
+        res_t.amp_t = nan(numRow, numCol);
+        res_t.amp_p = nan(numRow, numCol);
+        res_t.amp_ci = nan(2, numRow, numCol);
+        res_t.amp_df = nan(numRow, numCol);
 
-    for row = 1:numRow
-        for col = 1:numCol
+        for row = 1:numRow
+            for col = 1:numCol
 
-            % amp
-            [~, p, ci, stats] = ttest2(...
-                meanamp{1, row, col},...
-                meanamp{2, row, col});
-            res_t.amp_t(row, col) = stats.tstat;
-            res_t.amp_p(row, col) = p;
-            res_t.amp_ci(:, row, col) = ci;
-            res_t.amp_df(row, col) = stats.df;
+                % amp
+                [~, p, ci, stats] = ttest2(...
+                    meanamp{1, row, col},...
+                    meanamp{2, row, col});
+                res_t.amp_t(row, col) = stats.tstat;
+                res_t.amp_p(row, col) = p;
+                res_t.amp_ci(:, row, col) = ci;
+                res_t.amp_df(row, col) = stats.df;
 
-            % lat
-            [~, p, ci, stats] = ttest2(...
-                lat{1, row, col},...
-                lat{2, row, col});
-            res_t.lat_t(row, col) = stats.tstat;
-            res_t.lat_p(row, col) = p;
-            res_t.lat_ci(:, row, col) = ci;
-            res_t.lat_df(row, col) = stats.df;
+                % lat
+                [~, p, ci, stats] = ttest2(...
+                    lat{1, row, col},...
+                    lat{2, row, col});
+                res_t.lat_t(row, col) = stats.tstat;
+                res_t.lat_p(row, col) = p;
+                res_t.lat_ci(:, row, col) = ci;
+                res_t.lat_df(row, col) = stats.df;
 
-        end 
+            end 
+        end
     end
             
     %% make table
@@ -446,7 +448,10 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
         set(gcf, 'Color', bgcol)
         set(gca, 'color', bgcol);        
         h_leg = findobj(gcf, 'type', 'legend');
-        h_leg.Color = bgcol;
+        if ~isempty(h_leg)
+            arrayfun(@(x) set(x, 'color', bgcol), h_leg);
+%             h_leg.Color = bgcol;
+        end
     end
     
     if ~isempty(fgcol)
@@ -454,7 +459,10 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
         set(gca, 'YColor', fgcol)
         set(h_title, 'color', fgcol)
         h_leg = findobj(gcf, 'type', 'legend');
-        h_leg.TextColor = fgcol;
+        if ~isempty(h_leg)
+            arrayfun(@(x) set(x, 'TextColor', fgcol), h_leg);
+%             h_leg.TextColor = fgcol;
+        end
     end
     
     %% boxplots
@@ -494,8 +502,8 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
                 end
                 
                 % settings
-                set(gca, 'xtick', 1:numComp)
-                set(gca, 'xticklabel', comp_u)
+                set(gca, 'xtick', 1:numComp);
+                set(gca, 'xticklabel', comp_u);
                 xlabel(compare, 'Interpreter', 'none')
                 ylabel(ylab)
                 title(str)
@@ -537,8 +545,8 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
                 end
                 
                 % settings
-                set(gca, 'xtick', 1:numComp)
-                set(gca, 'xticklabel', comp_u)
+                set(gca, 'xtick', 1:numComp);
+                set(gca, 'xticklabel', comp_u);
                 xlabel(compare, 'Interpreter', 'none')
                 ylabel('Latency (s)')
                 title(str)
@@ -702,7 +710,7 @@ function [tab_stats, fig_erp, fig_bp_lat, fig_bp_amp, fig_hist_amp, res_t] =...
                     
                     % get data, make histogram
                     m = cell2mat(lat(comp, row, col));
-                    histgauss(m, 'linewidth', linewidth)
+                    histgauss(m, 'linewidth', linewidth);
 %                     [vals, edges, ~] =...
 %                         histcounts(m, binSize, 'Normalization', 'probability');                     
 %                     bar(edges(2:end), vals, 1, 'EdgeColor', 'none', 'FaceAlpha', .4);
