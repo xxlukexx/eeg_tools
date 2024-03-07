@@ -78,7 +78,8 @@ function [data_ft, smry] = eegFT_correctFromLightSensor(...
         tab.sample(e) = mrk_light(idx);
         
         % measure correction
-        
+        tab.corrected_samps(e) = tab.sample_uncorrected(e) - tab.sample(e);
+        tab.corrected_secs(e) = tab.corrected_samps(e) / data_ft.fsample;
         
     end
 

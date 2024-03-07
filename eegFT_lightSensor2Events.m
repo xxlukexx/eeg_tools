@@ -1,4 +1,4 @@
-function [found, mrk_samps, mrk_time, idx_chan] =...
+function [found, mrk_samps, mrk_time, idx_chan, ft_data] =...
     eegFT_lightSensor2Events(ft_data, thresh)
 % attempts to find a channel with light sensor data (voltage values above
 % thresh, default 1000µV) and then extracts event markers corresponding to
@@ -9,6 +9,9 @@ function [found, mrk_samps, mrk_time, idx_chan] =...
 %
 % if multiple trials exist in the ft struct, then the output args will be
 % cell arrays, with one element being the markers for each trial.
+%
+% returns ft_data with a .event struct containing events in fieldtrip
+% format. All values are set to 999. 
 %
 % Note that currently abstime is not segmented by trial (so doesn't support
 % multiple trials). TODO - fix in future if becomes necessary. Right now
@@ -24,9 +27,18 @@ function [found, mrk_samps, mrk_time, idx_chan] =...
             ERR.message)
     end
     
-    % default threshold is 1000µV
-    if ~exist('thresh', 'var') || isempty(thresh)
-        thresh = 1000;
+    % default threshold is set in eegFT_findLightSensorChannel if passed as
+    % empty
+    if ~exist('thresh', 'var') 
+        thresh = [];
+    end
+    
+    % extract absolute time field if present (ft functions will remove it
+    % we need to grab it before they do)
+    if isfield(ft_data, 'abstime')
+        abstime = ft_data.abstime;
+    else
+        abstime = [];
     end
 
 % look for channel
@@ -48,15 +60,16 @@ function [found, mrk_samps, mrk_time, idx_chan] =...
     mrk_time = cell(numTrials, 1);
     for t = 1:numTrials 
         
-        % extract light sensor channel
+        % extract light sensor channel and timestamps
         light = ft_data.trial{t}(idx_chan, :);
+        timestamps = ft_data.time{t};
         
         % get markers
-        mrk_samps{t} = eegLightSensor2Events(light, thresh);
+        mrk_samps{t} = eegLightSensor2Events(light, timestamps, thresh);
         
         % try to get timestamps
-        if isfield(ft_data, 'abstime')
-            mrk_time{t} = ft_data.abstime(mrk_samps{t});
+        if ~isempty(abstime)
+            mrk_time{t} = abstime(mrk_samps{t});
         else
             mrk_time{t} = [];
         end
@@ -67,6 +80,15 @@ function [found, mrk_samps, mrk_time, idx_chan] =...
     if numTrials == 1
         mrk_samps = mrk_samps{1};
         mrk_time = mrk_time{1};
+    end
+    
+    % make fieldtrip event struct
+    ft_data.event = struct;
+    num_events = length(mrk_samps);
+    for e = 1:num_events
+        ft_data.event(e).sample = mrk_samps(e);
+        ft_data.event(e).type = 'light_sensor';
+        ft_data.event(e).value = 999;
     end
         
 end

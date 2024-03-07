@@ -39,36 +39,46 @@ function [anyFound, idx_chan, reason, ft_data] = eegFT_findLightSensorChannel(ft
         data = horzcat(ft_data.trial{:});
     end
     
-    % loop through channels...
-    numChan = size(data, 1);
-    found = zeros(numChan, 1);
-    for c = 1:numChan
-        
-        % threshold and find runs
-        idx = data(c, :) >= thresh;
-        ct = findcontig2(idx);
-        
-        % if not voltages above threshold, move to next channel
-        if isempty(ct)
-            continue
-        end
-        
-        % remove runs below minimum duration
-        idx_tooShort = ct(:, 3) < min_samps;
-        ct(idx_tooShort, :) = [];
-        
-        % count number of runs left
-        found(c) = length(ct);
-
-    end
+    sd = std(data, [], 2);
+    idx_chan = find(sd == max(sd(:)));
     
-    % check at last one channel had some runs
-    anyFound = ~all(found == 0);
-    if anyFound
-        % find channel with most runs
-        idx_chan = found == max(found);
-    else
-        idx_chan = false(numChan, 1);
-    end
+    anyFound = true;
+    reason = '';
+    
+%     % loop through channels...
+%     numChan = size(data, 1);
+%     found = zeros(numChan, 1);
+%     for c = 1:numChan
+%         
+%         % zero the data
+%         data(c, :) = data(c, :) - min(data(c, :));
+%         
+%         % threshold and find runs
+%         idx = data(c, :) >= thresh;
+%         ct = findcontig2(idx);
+%         
+%         % if no voltages above threshold, move to next channel
+%         if isempty(ct)
+%             continue
+%         end
+%         
+%         % remove runs below minimum duration
+%         idx_tooShort = ct(:, 3) < min_samps;
+%         ct(idx_tooShort, :) = [];
+%         
+%         % count number of runs left
+%         found(c) = length(ct);
+% 
+%     end
+%     
+%     % check at last one channel had some runs
+%     anyFound = ~all(found == 0);
+%     if anyFound
+%         % find channel with most runs
+%         idx_chan = found == max(found);
+%         reason = '';
+%     else
+%         idx_chan = false(numChan, 1);
+%     end
     
 end
