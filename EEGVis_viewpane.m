@@ -3,12 +3,14 @@ classdef EEGVis_viewpane < teViewpane
     properties
         CurrentTrial = 1
         FGColour = [200, 200, 200]
-        BGColour = [030, 030, 050]        
+        BGColour = [030, 030, 050]      
+        Debug = false
     end
     
     properties (SetAccess = private)
         Data EEGVis_data
         Channels 
+        TimeLine
     end
     
     properties (Dependent, SetAccess = private)
@@ -18,6 +20,12 @@ classdef EEGVis_viewpane < teViewpane
     properties (Access = private)
         isInitialised = false
         channelLayoutPx
+        yLimChange = [0, 0]
+    end
+    
+    events
+        MouseOverChannel
+        MouseClickOnChannel
     end
     
     methods
@@ -26,18 +34,12 @@ classdef EEGVis_viewpane < teViewpane
             
             % store data
             obj.Data = data; 
-            
+                        
         end
         
         function Update(obj)
             
-            if ~obj.isInitialised
-                obj.Initialise
-            end
-            
-            for c = 1:length(obj.Channels)
-                obj.Channels{c}.Update
-            end
+
                 
         end
         
@@ -93,7 +95,11 @@ classdef EEGVis_viewpane < teViewpane
                     obj.ParentPtr,...
                     obj.channelLayoutPx(idx_layout, 1),...
                     obj.channelLayoutPx(idx_layout, 2),...
-                    200, 200);
+                    120, 120,...
+                    obj);
+                
+                % set debug
+                obj.Channels{c}.Debug = obj.Debug;
                 
             end
             
@@ -101,12 +107,18 @@ classdef EEGVis_viewpane < teViewpane
         
         function Draw(obj)
             
+            if ~obj.isInitialised
+                obj.Initialise
+            end
+       
             % clear
             Screen('FillRect', obj.Ptr, obj.BGColour);
             
-            Screen('FrameRect', obj.Ptr, [255, 000, 255], [0, 0, obj.Size]);
+%             Screen('FrameRect', obj.Ptr, [255, 000, 255], [0, 0, obj.Size]);
             
             for c = 1:length(obj.Channels)
+                
+                obj.Channels{c}.Update;         
                 
                 x = obj.Channels{c}.X;
                 y = obj.Channels{c}.Y;
@@ -114,10 +126,7 @@ classdef EEGVis_viewpane < teViewpane
                 h = obj.Channels{c}.Height;
                 rect_dest = [x, y, x + w, y + h];
                 channel_ptr = obj.Channels{c}.Ptr;
-                
-%                 Screen('FrameRect', obj.Ptr, [100, 200, 0], rect_dest);
 
-                
                 Screen('DrawTexture', obj.Ptr, channel_ptr, [], rect_dest);
                 
             end
@@ -125,16 +134,31 @@ classdef EEGVis_viewpane < teViewpane
             str_trial = sprintf('Trial %04d of %04d', obj.CurrentTrial, obj.Data.NumTrials);
             Screen('DrawText', obj.Ptr, str_trial, 2, 2, obj.FGColour);
             
+%             obj.TimeLine.Draw;
+            
+            if obj.Debug
+                fprintf('[EEGVis_viewpane.Draw]: finished drawing\n')
+            end
+            
         end
         
         function HandleKeyboard(obj, ~, event)
             
-            switch KbName(event.Data{1})
+            keyName = KbName(event.Data{1});
+            if isscalar(keyName) || ischar(keyName)
                 
-                case 'LeftArrow'
-                    obj.MoveToPreviousTrial
-                case 'RightArrow'
-                    obj.MoveToNextTrial
+                switch keyName
+
+                    case 'LeftArrow'
+                        obj.MoveToPreviousTrial
+                    case 'RightArrow'
+                        obj.MoveToNextTrial
+                    case 'UpArrow'
+                        obj.IncreaseYLim
+                    case 'DownArrow'
+                        obj.DecreaseYLim
+                end
+                
             end
             
         end
@@ -164,7 +188,38 @@ classdef EEGVis_viewpane < teViewpane
             obj.Parent.Draw
         end
         
-           
+        function IncreaseYLim(obj)
+            obj.yLimChange = [1.4, 1.4];
+            obj.YLimChanged
+        end
+        
+        function DecreaseYLim(obj)
+            obj.yLimChange = [.7, .7];
+            obj.YLimChanged
+        end
+        
+        function YLimChanged(obj)
+                       
+            for c = 1:length(obj.Channels)
+                obj.Channels{c}.YLim = obj.Channels{c}.YLim ./ obj.yLimChange;
+                obj.Channels{c}.Draw;
+            end
+            
+            obj.yLimChange = [0, 0];
+            
+        end
+        
+        function HandleMouseMove(obj, ~, event)
+            
+            % find the channel that the mouse is over
+            mx = event.Source.MouseX;
+            my = event.Source.MouseY;
+            
+            for c = 1:length(obj.Channels)
+                obj.Channels{c}.MouseHitTest(mx, my);
+            end
+            
+        end
         
         % get/set
         function val = get.Valid(~)

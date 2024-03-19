@@ -503,6 +503,9 @@ classdef tePeakFinder_local < handle
                     continue
                 end
                 erp = obj.SelectedData.(pd.condition);
+                if isempty(erp)
+                    continue
+                end
                 
                 % find channel index
                 idx_ch = find(strcmpi(erp.label, pd.electrode), 1);
