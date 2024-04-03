@@ -1,5 +1,5 @@
 function [canInterp, canInterpLab, nb, summary] =...
-    eegAR_FindInterpChans(data, bad, cmdEcho, nb)
+    eegAR_FindInterpChans(data, bad, cmdEcho, nb, crit_min_num_good_neighbours)
 
     % [canInterp, canInterpLab, nb, summary] =...
     %       eegAR_FindInterpChans(data, bad, cmdEcho, nb)
@@ -17,6 +17,8 @@ function [canInterp, canInterpLab, nb, summary] =...
     % nb            -   (optional) fieldtrip neighbours structure. Will be
     %                   calculated if not supplied. Save time by passing a
     %                   previously used structure. 
+    % crit_min_num_good_neighbours - criterion for the minimum number of
+    %                   good (clean) neighbouring channels -- default is 3
     %
     % OUTPUT ARGS
     % canInterp     -   logical index of which channels can be interpolated
@@ -46,6 +48,11 @@ function [canInterp, canInterpLab, nb, summary] =...
     
     if ~exist('cmdEcho', 'var') || isempty(cmdEcho)
         cmdEcho = true;
+    end
+    
+    if ~exist('crit_min_num_good_neighbours', 'var') ||...
+            isempty(crit_min_num_good_neighbours)
+        crit_min_num_good_neighbours = 3;
     end
     
     % if no chans marked as bad, quit
@@ -87,7 +94,7 @@ function [canInterp, canInterpLab, nb, summary] =...
             nbLabs{ch} = horzcat(labs{:});
             
             % check whether any neighbours are also bad
-            nbAllValid(ch) = length(nbIdx(~bad(nbIdx))) >= 3;
+            nbAllValid(ch) = length(nbIdx(~bad(nbIdx))) >= crit_min_num_good_neighbours;
             
             % get labels of also bad neighbours
             labs = cellfun(@(x) [x, ' '], data.label(nbIdx(bad(nbIdx))),...

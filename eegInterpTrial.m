@@ -1,6 +1,6 @@
 function [data, chanInterp, trialInterp, totInterp, propInterp,...
     interpMat, interpNeigh, cantInterp] =...
-    eegInterpTrial(data, art, distance, nb)
+    eegInterpTrial(data, art, distance, nb, crit_min_good_neighbours)
 
     % [data, chanInterp, trialInterp, totInterp, propInterp,...
     %       interpMat, interpNeigh, cantInterp] =...
@@ -16,6 +16,8 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
     % nb            -   (optional) fieldtrip neighbours structure. Will be
     %                   calculated if not supplied. Save time by passing a
     %                   previously used structure. 
+    % crit_min_good_neighbours - criterion for min num of good (clean)
+    %                   neighbouring electrodes to interp FROM
     %
     % OUTPUT ARGS
     % data          -   intepolated data
@@ -75,7 +77,7 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
         
         % check that there are some channels with artefacts on this current
         % trial
-        if ~any(art.matrix(:, tr, :), 3), continue, end
+        if ~any(any(art.matrix(:, tr, :), 3)), continue, end
         
         % select data from current trial
         cfg = [];
@@ -90,7 +92,7 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
         
         % find non-bad neighbours
         [canInterp, canInterpLabs, canInterpNb, canInterpSmry] =...
-            eegAR_FindInterpChans(data, bad, false, nb);
+            eegAR_FindInterpChans(data, bad, false, nb, crit_min_good_neighbours);
         
         % store indices of channels that can't be interpolated
         cantInterp(:, tr) = bad & ~canInterp;
