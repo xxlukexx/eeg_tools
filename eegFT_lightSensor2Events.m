@@ -1,5 +1,5 @@
 function [found, mrk_samps, mrk_time, idx_chan, ft_data] =...
-    eegFT_lightSensor2Events(ft_data, thresh)
+    eegFT_lightSensor2Events(ft_data, thresh, idx_chan)
 % attempts to find a channel with light sensor data (voltage values above
 % thresh, default 1000µV) and then extracts event markers corresponding to
 % the onset of each event. Returns markers as a vector of a) sample indices
@@ -19,6 +19,9 @@ function [found, mrk_samps, mrk_time, idx_chan, ft_data] =...
 
 % setup
 
+    need_detection = false;
+    found = false;
+
     % try to init ft
     try
         ft_defaults
@@ -31,7 +34,15 @@ function [found, mrk_samps, mrk_time, idx_chan, ft_data] =...
     % empty
     if ~exist('thresh', 'var') 
         thresh = [];
+        need_detection = true;
     end
+    
+    % if a channel containing light sensor data is not specified, we need
+    % to detect it
+    if ~exist('idx_chan', 'var') 
+        idx_chan = [];
+        need_detection = true;
+    end    
     
     % extract absolute time field if present (ft functions will remove it
     % we need to grab it before they do)
@@ -43,13 +54,18 @@ function [found, mrk_samps, mrk_time, idx_chan, ft_data] =...
 
 % look for channel
 
-    [anyFound, idx_chan, ~, ft_data] =...
-        eegFT_findLightSensorChannel(ft_data, thresh);
-    if ~anyFound
-        found = false;
-        mrk_samps = [];
-        mrk_time = [];
-        return
+    if need_detection
+        
+        [anyFound, idx_chan, ~, ft_data] =...
+            eegFT_findLightSensorChannel(ft_data, thresh);
+        
+        if ~anyFound
+            found = false;
+            mrk_samps = [];
+            mrk_time = [];
+            return
+        end
+        
     end
     
 % extract markers
