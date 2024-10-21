@@ -60,8 +60,14 @@ classdef tePeakFinder_local < handle
     methods
         
         % constructor
-        function obj = tePeakFinder_local(def, erpVarName, path_mat, path_temp)
+        function obj = tePeakFinder_local(def, erpVarName, path_mat, path_temp, hide_valid)
         % pass this method a peak definition to initiate the peak finder
+        
+            % optionally can hide valid peaks, useful when reviewing,
+            % default to false (show all)
+            if ~exist('hide_valid', 'var') || isempty(hide_valid)
+                hide_valid = false;
+            end
         
         % check that the format of the peak def is valid
         
@@ -129,7 +135,7 @@ classdef tePeakFinder_local < handle
             
         % read data
         
-            obj.readMetadata
+            obj.readMetadata(hide_valid)
             
         % draw UI
         
@@ -349,7 +355,7 @@ classdef tePeakFinder_local < handle
     
     methods %(Access = private)
         
-        function readMetadata(obj)
+        function readMetadata(obj, hide_valid)
             
             file_md = fullfile(obj.PathData, 'metadata.mat');
             if ~exist(file_md, 'file')
@@ -358,6 +364,28 @@ classdef tePeakFinder_local < handle
             
             tmp = load(file_md);
             tmp.tab = [tmp.tab, teLogExtract(tmp.md)];
+            
+            % optionally hide participants with all valid peaks
+            if hide_valid
+                
+                num_rows = size(tmp.tab, 1);
+                hide = false(num_rows, 1);
+                for i = 1:num_rows
+                    try
+                       vals = struct2cell(tmp.tab.peakrating{i});
+                       hide(i) = isequal(vals{:});
+                    catch ERR
+                        hide(i) = false;
+                    end
+                end
+                
+                tmp.tab(hide, :) = [];
+                tmp.md(hide) = [];
+                warning('Hid %d valid datasets', sum(hide))
+                
+            end
+            
+            
             obj.Metadata = tmp.md;
             obj.Table = tmp.tab;
             

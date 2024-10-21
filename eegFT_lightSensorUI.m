@@ -3,12 +3,14 @@ classdef eegFT_lightSensorUI < handle
     properties
         Data    
         Session teSession
+        WantedEEGEvents
         
         % colours
             BackgroundColor = [0.15, 0.15, 0.20]
             ForegroundColor = [0.90, 0.85, 0.75]
             LightSensorColor = [0.60, 0.65, 0.85]
             EventColor = [0.60, 0.35, 0.20];
+            SessionEventColor = [0.85, 0.65, 0.45];
             CalculatedColor = [1.0, 0.0, 1.0];
             IgnoreColor = [0.45, 0.15, 0.20]
             AttendColor = [0.15, 0.45, 0.20]
@@ -16,11 +18,12 @@ classdef eegFT_lightSensorUI < handle
         DrawLightSensorSampleDelta = true
         Crit_DurationRange = [0.140, 0.210];
         Crit_ThresholdZ = 4;
+        UnwantedEvents = [255]
+        SessionEEGOffset = 0;
+        idxLightSensorChannel = 8
     end
     
     properties (SetAccess = private)
-        idxLightSensorChannel
-        WantedEEGEvents
         ValidReason = 'uninitialised'
     end
     
@@ -84,6 +87,8 @@ classdef eegFT_lightSensorUI < handle
         formattedEvents
         selectedEventIdx = nan
         lightSensorEventTable 
+        eegEventTable
+        sesEventTable
 
         % data
         lsDelta
@@ -289,11 +294,11 @@ classdef eegFT_lightSensorUI < handle
             
             % create events
             tab_events = table;
-%             tab_events.local_time = ctt_on(:, 1);
             tab_events.label = repmat({'LIGHT_SENSOR_ON'}, num_on, 1);
             tab_events.eeg_code = nan(num_on, 1);
             tab_events.wanted = true(num_on, 1);
             tab_events.sample = ct_on(:, 1);
+            tab_events.local_time = obj.Data.time{1}(tab_events.sample);        
             tab_events.timestamp = nan(num_on, 1);
             tab_events.source = repmat({'light_sensor'}, num_on, 1);
             tab_events = sortrows(tab_events, 'sample');
@@ -333,6 +338,347 @@ classdef eegFT_lightSensorUI < handle
             
             obj.Draw
             
+        end
+        
+        function [tab_eeg, tab_light_sensor, tab_session, ft_data, session] = ExportEvents(obj)
+            tab_eeg = obj.eegEventTable;
+            tab_light_sensor = obj.lightSensorEventTable;
+            tab_session = obj.sesEventTable;
+            ft_data = obj.Data;
+            session = obj.Session;
+        end
+        
+        function tab_eeg = CreateAndFormatEEGEvents(obj)
+            
+            % format EEG events into a table
+            
+                tab_eeg = struct2table(obj.Data.events);
+                
+                % optionally remove unwanted events
+                if ~isempty(obj.UnwantedEvents)
+                    idx = ismember(tab_eeg.value, obj.UnwantedEvents);
+                    tab_eeg(idx, :) = [];
+                    fprintf('[eegFT_lightSensorUI]: Removed %d unwanted events\n',...
+                        sum(idx));
+                end
+                
+                % rename column headers to match session table
+                tab_eeg.Properties.VariableNames{'value'} = 'eeg_code';
+                tab_eeg.Properties.VariableNames{'type'} = 'source';
+                
+                % if we have an abstime (absolute time, not standard
+                % fieldtrip but present in enobio data) then use that.
+                % Otherwise, use the standard fieldtrip timestamps (with an
+                % arbitrary zero point)
+                if isfield(obj.Data, 'abstime')
+                    t_eeg = obj.Data.abstime;
+                else
+                    t_eeg = obj.Data.time{1};
+                end
+                
+                % look up timestamps for each event onset, remove "sample"
+                % column
+                idx_exceeds = tab_eeg.sample > length(t_eeg);
+                if any(idx_exceeds)
+                    warning('%d samples of EEG data exceed EEG timestamps -- check',...
+                        sum(idx_exceeds))
+                end
+                tab_eeg.timestamp(~idx_exceeds) = t_eeg(tab_eeg.sample(~idx_exceeds));
+                
+                % append "wanted" column
+                if isempty(obj.WantedEEGEvents)
+                    tab_eeg.wanted = true(size(tab_eeg, 1), 1);
+                else
+                    tab_eeg.wanted = ismember(tab_eeg.eeg_code, obj.WantedEEGEvents);
+                end           
+                
+                % if registered events are available, look up labels for
+                % the EEG events. Otherwise use a string of the eeg code
+                
+                    if isprop(obj.Session, 'RegisteredEvents') &&...
+                            ~isempty(obj.Session.RegisteredEvents)
+
+                        % look up codes
+                        tab_eeg.label = teCodes2RegisteredEvents(...
+                            obj.Session.RegisteredEvents, tab_eeg.eeg_code);    
+
+                    else
+                        
+                        tab_eeg.label = cellstr(num2str(tab_eeg.eeg_code));
+                        
+                    end                    
+
+                % create session time variable (time elapsed from 0 at session
+                % start)
+                idx_exceeds = tab_eeg.sample > length(obj.Data.time{1});
+                sample = tab_eeg.sample(~idx_exceeds);
+                time = obj.Data.time{1}(sample);             
+                tab_eeg.local_time(1:length(time)) = time;
+                    
+            obj.eegEventTable = tab_eeg;
+                    
+        end
+        
+        function tab_ses = CreateAndFormatSessionEvents(obj)
+            
+            tab_ses = obj.Session.Log.Events;
+            
+            % look for errored timestamps by z-scoring and treating as
+            % outliers
+            tab_ses.z_timestamp = zscore(tab_ses.timestamp);
+            idx_outlier = abs(tab_ses.z_timestamp) > 5;
+            if any(idx_outlier)
+                warning('Removing %d events with errored (outlier) timestamps',...
+                    sum(idx_outlier))
+                tab_ses(idx_outlier, :) = [];
+            end
+            tab_ses.z_timestamp = [];
+            
+            tab_ses = tab_ses(:, {'timestamp', 'data', 'source'});
+            tab_ses.Properties.VariableNames{'data'} = 'label';
+            tab_ses.local_time =...
+                tab_ses.timestamp - tab_ses.timestamp(1) + obj.SessionEEGOffset;
+            tab_ses.eeg_code = teRegisteredEvents2Codes(...
+                obj.Session.RegisteredEvents, tab_ses.label, 'eeg');
+            tab_ses.wanted = ismember(tab_ses.eeg_code, obj.WantedEEGEvents);
+            tab_ses.sample = nan(size(tab_ses, 1), 1);
+            
+            tab_ses = movevars(tab_ses, {'local_time', 'label', 'eeg_code',...
+                'source', 'wanted', 'sample', 'timestamp'}, 'before', 1);
+            obj.sesEventTable = tab_ses;
+            
+        end
+        
+        function tab = FormatEventTables(obj)
+            
+            tab_eeg = obj.eegEventTable;
+            tab_ses = obj.sesEventTable;
+            tab_ls = obj.lightSensorEventTable;
+            
+            % ensure light sensor table has a local_time variable
+            if ~isempty(tab_ls) && ~ismember('local_time', tab_ls.Properties.VariableNames)
+                tab_ls.local_time = obj.Data.time{1}(tab_ls.sample);        
+            end
+            
+           % cat both tables
+                    
+                tab = [tab_eeg; tab_ses; tab_ls];
+                tab = sortrows(tab, 'local_time');
+                
+            % colour code cells
+            
+                % Color code cells by source
+                [src_u, ~, src_s] = unique(tab.source);
+                num_sources = length(src_u);
+                cols_src = cool(num_sources) .* 0.4; % Dim the colors
+                fg_col = obj.ForegroundColor;
+                fg_col_str = sprintf('#%02X%02X%02X', round(fg_col * 255)); % Convert to hex
+
+                for s = 1:num_sources
+                    idx = s == src_s;
+                    bg_col_str = sprintf('#%02X%02X%02X', round(cols_src(s, :) * 255));
+                    str = sprintf('<html><table><tr><td bgcolor=%s><font color="%s">%s</font></td></tr></table></html>', bg_col_str, fg_col_str, src_u{s});
+                    tab.source(idx) = repmat({str}, sum(idx), 1);        
+                end
+                
+            tab = movevars(...
+                tab,...
+                {'local_time', 'label', 'eeg_code', 'source', 'wanted'},...
+                'before', 1);
+            
+            % Color code each section of the label
+            
+                % Define a function to blend colors with white
+                blend_with_white = @(color, blend_factor) min(1, color + blend_factor * (1 - color));
+                blend_factor = 0.65; % Closer to 1 means lighter colors
+
+                % Original colors to blend
+                original_colors = {
+                    [1, 0, 0], % Red
+                    [0, 1, 0], % Green
+                    [0, 0, 1], % Blue
+                    [1, 1, 0], % Yellow
+                    [1, 0, 1], % Magenta
+                    [0, 1, 1], % Cyan
+                    [1, 1, 1]  % White
+                };
+
+                % Blend colors with white
+                blended_colors = cellfun(@(c) blend_with_white(c, blend_factor), original_colors, 'UniformOutput', false);
+
+                % Convert blended colors to hex
+                blended_colors_hex = cellfun(@(c) sprintf('#%02X%02X%02X', round(c * 255)), blended_colors, 'UniformOutput', false);
+
+                % Color code each section of the label
+                for i = 1:height(tab)
+                    if isempty(tab.label{i}), continue, end
+                    label_parts = split(tab.label{i}, '_');
+                    colored_label = '';
+                    for j = 1:length(label_parts)
+                        color = blended_colors_hex{mod(j-1, length(blended_colors_hex)) + 1}; % Cycle through colors
+                        colored_label = strcat(colored_label, sprintf('<font color="%s">%s</font>', color, label_parts{j}));
+                        if j < length(label_parts)
+                            colored_label = strcat(colored_label, '_');
+                        end
+                    end
+                    tab.label{i} = strcat('<html><body>', colored_label, '</body></html>');
+                end     
+                
+        end
+        
+        % sync
+        
+        function [tab1, tab2, pairs] = PairEvents(obj, event_type1, event_type2, tolerance_s)
+        % pairs two event types (e.g. EEG and light sensor) if they are
+        % within a certain temporal tolerance. event_type1 is the master,
+        % an each event within it will, if possible, be paired to an event
+        % in event_type2. 
+        
+            if ~exist('tolerance_s', 'var') || isempty(tolerance_s)
+                tolerance_s = 0.100;
+                warning('No temporal tolerance supplied, defaulting to 100ms.')
+            end
+            
+            % get tables based on passed event types
+            tab1 = obj.getEventTable(event_type1);
+            tab2 = obj.getEventTable(event_type2);      
+
+            % remove unwanted events (those that don't trigger the
+            % light sensor)
+            tab1(~tab1.wanted, :) = [];
+            tab2(~tab2.wanted, :) = [];
+            
+            % loop through table1 events and attempt to pair each one to
+            % a table2 event
+            num_event1 = size(tab1, 1);
+            num_event2 = size(tab2, 1);
+            pairs = nan(num_event1, 2);
+            pair_success = false(num_event1, 1);
+            for i = 1:num_event1            
+            
+                % find time window to search for session events within,
+                % defined by threshold 
+                event1_time = tab1.local_time(i);
+                t1_search = event1_time - tolerance_s;
+                t2_search = event1_time + tolerance_s;
+                idx_search = find(tab2.local_time >= t1_search &...
+                    tab2.local_time <= t2_search);
+                tab1.num_candidate_pairs(i) = length(idx_search);
+                
+                % no matches
+                if tab1.num_candidate_pairs(i) == 0
+                    
+                   % unable to pair
+                   tab1.pair_outcome{i} = 'unable to pair';
+                   continue
+                   
+                end
+                
+                % multiple matches
+                if tab1.num_candidate_pairs(i) > 1
+                                        
+                    % find delta between current light sensor event and
+                    % all session events in the search results
+                    t_delta = abs(event1_time - tab2.local_time(idx_search));
+                    idx_best = t_delta == min(t_delta);
+
+                    % has this solved the problem?
+                    num_refined_matches = sum(idx_best);
+                    if num_refined_matches == 1
+
+                        % now only one match, remove others
+                        idx_search(~idx_best) = [];
+                        tab1.num_candidate_pairs(i) = 1;
+
+                    elseif num_refined_matches > 1
+
+                        % two events that must be equally close,
+                        % cannot pair
+                        tab1.num_candidate_pairs(i) = num_refined_matches;
+                        tab1.pair_outcome{i} = 'cannot pair - multiple matches';
+                        continue
+
+                    end
+                                        
+                end 
+                
+                % just one match
+                if tab1.num_candidate_pairs(i) == 1
+                    
+                    % one match -- pair
+                    tab1.pair_outcome{i} = 'paired';
+                    pair_success(i) = true;
+                    pairs(i, 1) = i;                % light sensor idx
+                    pairs(i, 2) = idx_search;       % session idx
+
+                end
+                
+            end
+            
+            % post process
+            
+                % remove unpaireed light sensor events from pairing list
+                pairs = pairs(pair_success, :);
+                
+                % store paired events in respective tables
+                tab1.paired_session_event_idx = nan(num_event1, 1);
+                tab1.paired_session_event_idx(pairs(:, 1)) = pairs(:, 2);
+                tab2.paired_light_sensor_event_idx = nan(num_event2, 1);
+                tab2.paired_light_sensor_event_idx(pairs(:, 2)) = pairs(:, 1);
+            
+        end
+        
+        function RecreateEEGEventsFromSessionEventsAndLightSensor(obj)
+        % takes the identity (value, e.g. 128) from the session events, 
+        % and the latency of the events from the light sensor, and creates
+        % a new EEG (fieldtrip) events struct. Recreates missing EEG events
+        % from the light sensort and the session events. 
+        
+            % pair session and light sensor events
+            [tab_ls, tab_ses, pairs] = obj.PairEvents('light_sensor', 'session');
+        
+            % get sample index for light sensor and posix timestamp
+            % from session
+            s_light_sensor = tab_ls.local_time(pairs(:, 1));
+            t_session = tab_ses.local_time(pairs(:, 2));
+
+            % form regression equation
+            x = t_session;
+            y = s_light_sensor;
+            if length(x) > 1 && length(y) > 1
+                mdl = fitlm(x, y);
+                sync_r2 = mdl.Rsquared.Ordinary;
+            else
+                mdl = [];
+                sync_r2 = -inf;
+                error('No available paired events')
+            end
+
+            % get full list of session events (including 'unwanted'
+            % event that don't trigger the light sensor). Here we want
+            % to recreate EVERY session event as an EEG event, whether
+            % or not it triggers the light sensor
+            tab_ses_full = obj.sesEventTable;
+            num_ses_full = size(tab_ses_full, 1);
+
+            % predict local time latency of each session event in light
+            % sensor temporal space
+            tab_eeg = table;
+            local_time_pred = mdl.predict(tab_ses_full.local_time);
+            sample_pred = round(local_time_pred * obj.Data.fsample);
+            tab_eeg.sample = sample_pred;
+            tab_eeg.type = repmat({'eeg'}, num_ses_full, 1);
+            tab_eeg.value = tab_ses_full.eeg_code;                
+            tab_eeg.type = repmat({'eeg'}, num_ses_full, 1);
+            tab_eeg.value = tab_ses_full.eeg_code;
+
+            % convert to fieldtrip events struct and store in the
+            % fieldtrip data structure
+            obj.Data.events = table2struct(tab_eeg);
+
+            % re-make events in visualiser
+            obj.UpdateUI_Events
+
         end
         
         % graph
@@ -558,6 +904,8 @@ classdef eegFT_lightSensorUI < handle
 
             for i = 1:num_events
                 
+                if isempty(tab.label{i}), continue, end
+                
                 % get x coord (event timestamp)
                 event_time = tab.local_time(i); 
                 
@@ -574,6 +922,8 @@ classdef eegFT_lightSensorUI < handle
                 
                 if contains(tab.source{i}, 'light_sensor')
                     col_event = obj.LightSensorColor;
+                elseif contains(tab.source{i}, 'teEventRelay_Log')
+                    col_event = obj.SessionEventColor;
                 else
                     col_event = obj.EventColor;
                 end
@@ -874,118 +1224,10 @@ classdef eegFT_lightSensorUI < handle
         
         function CreateUI_Events(obj)
             
-            % format EEG events into a table
-            
-                tab_eeg = struct2table(obj.Data.events);
+            obj.CreateAndFormatEEGEvents;
+            obj.CreateAndFormatSessionEvents; 
                 
-                % rename column headers to match session table
-                tab_eeg.Properties.VariableNames{'value'} = 'eeg_code';
-                tab_eeg.Properties.VariableNames{'type'} = 'source';
-
-                
-                % if we have an abstime (absolute time, not standard
-                % fieldtrip but present in enobio data) then use that.
-                % Otherwise, use the standard fieldtrip timestamps (with an
-                % arbitrary zero point)
-                if isfield(obj.Data, 'abstime')
-                    t_eeg = obj.Data.abstime;
-                else
-                    t_eeg = obj.Data.time{1};
-                end
-                
-                % look up timestamps for each event onset, remove "sample"
-                % column
-                tab_eeg.timestamp = t_eeg(tab_eeg.sample);
-                
-                % append "wanted" column
-                if isempty(obj.WantedEEGEvents)
-                    tab_eeg.wanted = true(size(tab_eeg, 1), 1);
-                else
-                    tab_eeg.wanted = ismember(tab_eeg.eeg_code, obj.WantedEEGEvents);
-                end           
-                
-                % if registered events are available, look up labels for
-                % the EEG events. Otherwise use a string of the eeg code
-                
-                    if isprop(obj.Session, 'RegisteredEvents') &&...
-                            ~isempty(obj.Session.RegisteredEvents)
-
-                        % look up codes
-                        tab_eeg.label = teCodes2RegisteredEvents(...
-                            obj.Session.RegisteredEvents, tab_eeg.eeg_code);    
-
-                    else
-                        
-                        tab_eeg.label = cellstr(num2str(tab_eeg.eeg_code));
-                        
-                    end
-                
-           % cat both tables
-                    
-                tab = [tab_eeg; obj.lightSensorEventTable];
-                tab = sortrows(tab, 'sample');
-                
-            % colour code cells
-            
-                % Color code cells by source
-                [src_u, ~, src_s] = unique(tab.source);
-                num_sources = length(src_u);
-                cols_src = cool(num_sources) .* 0.4; % Dim the colors
-                fg_col = obj.ForegroundColor;
-                fg_col_str = sprintf('#%02X%02X%02X', round(fg_col * 255)); % Convert to hex
-
-                for s = 1:num_sources
-                    idx = s == src_s;
-                    bg_col_str = sprintf('#%02X%02X%02X', round(cols_src(s, :) * 255));
-                    str = sprintf('<html><table><tr><td bgcolor=%s><font color="%s">%s</font></td></tr></table></html>', bg_col_str, fg_col_str, src_u{s});
-                    tab.source(idx) = repmat({str}, sum(idx), 1);        
-                end
-                
-            % create session time variable (time elapsed from 0 at session
-            % start)
-            tab.local_time = obj.Data.time{1}(tab.sample);
-                
-            tab = movevars(...
-                tab,...
-                {'local_time', 'label', 'eeg_code', 'source', 'wanted'},...
-                'before', 1);
-            
-            % Color code each section of the label
-            
-                % Define a function to blend colors with white
-                blend_with_white = @(color, blend_factor) min(1, color + blend_factor * (1 - color));
-                blend_factor = 0.65; % Closer to 1 means lighter colors
-
-                % Original colors to blend
-                original_colors = {
-                    [1, 0, 0], % Red
-                    [0, 1, 0], % Green
-                    [0, 0, 1], % Blue
-                    [1, 1, 0], % Yellow
-                    [1, 0, 1], % Magenta
-                    [0, 1, 1], % Cyan
-                    [1, 1, 1]  % White
-                };
-
-                % Blend colors with white
-                blended_colors = cellfun(@(c) blend_with_white(c, blend_factor), original_colors, 'UniformOutput', false);
-
-                % Convert blended colors to hex
-                blended_colors_hex = cellfun(@(c) sprintf('#%02X%02X%02X', round(c * 255)), blended_colors, 'UniformOutput', false);
-
-                % Color code each section of the label
-                for i = 1:height(tab)
-                    label_parts = split(tab.label{i}, '_');
-                    colored_label = '';
-                    for j = 1:length(label_parts)
-                        color = blended_colors_hex{mod(j-1, length(blended_colors_hex)) + 1}; % Cycle through colors
-                        colored_label = strcat(colored_label, sprintf('<font color="%s">%s</font>', color, label_parts{j}));
-                        if j < length(label_parts)
-                            colored_label = strcat(colored_label, '_');
-                        end
-                    end
-                    tab.label{i} = strcat('<html><body>', colored_label, '</body></html>');
-                end       
+            tab = obj.FormatEventTables;
             
             obj.uiEvents_table = uitable(...
                 'Parent', obj.uiEvents,...
@@ -995,7 +1237,7 @@ classdef eegFT_lightSensorUI < handle
                 'BackgroundColor', obj.BackgroundColor,...
                 'Data', table2cell(tab),...
                 'FontSize', 14,...
-                'ColumnFormat', {'bank', [], [], [], [], 'long g'},...
+                'ColumnFormat', {[], [], [], [], [], 'long g'},...
                 'ColumnWidth',  'auto',...
                 'ColumnName', tab.Properties.VariableNames,...
                 'CellSelectionCallback', @obj.uiEvents_Click);
@@ -1010,6 +1252,19 @@ classdef eegFT_lightSensorUI < handle
             jTable.setBackground(java.awt.Color(0.1, 0.1, 0.1));            
             
             uitableAutoColumnHeaders(obj.uiEvents_table);
+            
+            obj.formattedEvents = tab;
+            
+        end
+        
+        function UpdateUI_Events(obj)
+            
+            obj.CreateAndFormatEEGEvents;
+            obj.CreateAndFormatSessionEvents; 
+                
+            tab = obj.FormatEventTables;
+            
+            obj.uiEvents_table.Data = table2cell(tab);
             
             obj.formattedEvents = tab;
             
@@ -1242,6 +1497,13 @@ classdef eegFT_lightSensorUI < handle
                     obj.uiEvents_beingUpdated);
             end
             
+            if isempty(event.Indices)
+                if obj.debug
+                    fprintf('[uiEvents_Click]: empty events.indices -> quitting');
+                end       
+                return
+            end
+            
             if obj.uiEvents_beingUpdated, return, end
             
             if isequal(obj.uiEvents_selection, event.Indices(1))
@@ -1429,6 +1691,8 @@ classdef eegFT_lightSensorUI < handle
             % end (i.e. it's more important that FT data is entirely
             % missing than that the light sensor channel hasn't been ID'd)
             
+                obj.ValidReason = 'valid';
+                
                 if ~val_ls_channel
                     obj.ValidReason = 'light sensor channel not identified';
                 end
@@ -1446,7 +1710,7 @@ classdef eegFT_lightSensorUI < handle
         
         function set.Data(obj, val)
             obj.Data = val;
-            obj.UpdateGraph
+%             obj.UpdateGraph
         end 
         
         function set.Session(obj, val)
@@ -1523,18 +1787,6 @@ classdef eegFT_lightSensorUI < handle
             val = obj.Session.Log.LogArray{end}.timestamp - obj.Session.Log.LogArray{1}.timestamp;      
             
         end
-        
-%         function set.ui_mouseIsDown(obj, val)
-%             obj.ui_mouseIsDown = val;
-%             disp(val)
-%         end
-        
-%         function set.ui_selectedRectHandle(obj, val)
-%             obj.ui_selectedRectHandle = val;
-%             % debug: when this property is set, print the stack to the command window
-%             disp(dbstack)
-% 
-%         end
        
     end
     
@@ -1555,6 +1807,9 @@ classdef eegFT_lightSensorUI < handle
             % otherwise use its current position (as this method has been
             % triggered by a window resize rather than instantiation)
             
+                if isempty(obj.uiFig)
+                    obj.uiFig = gcf;
+                end
                 figure_valid = ~isempty(obj.uiFig) &&...
                     isa(obj.uiFig, 'matlab.ui.Figure');
                 if ~figure_valid
@@ -1656,6 +1911,32 @@ classdef eegFT_lightSensorUI < handle
                 
         end
         
+        function tab = getEventTable(obj, event_type)
+        % parses event_type and returns the corresponding table. If the
+        % table doesn't have a local_time variable but does have a sample
+        % variable, then local_time will be created with reference to
+        % obj.Data (fieldtrip) sampling rate
+        
+            switch event_type
+                case 'eeg'
+                    tab = obj.eegEventTable;
+                case 'light_sensor'
+                    tab = obj.lightSensorEventTable;
+                case {'teEventRelay_Log', 'session'}
+                    tab = obj.sesEventTable;
+                otherwise
+                    error('%s is not a valid event type, use either ''eeg'', ''light_sensor'', or ''session''',...
+                        event_type)
+            end
+            
+            % ensure light sensor table has a local_time variable
+            if ~isempty(tab) &&...
+                    ~ismember('local_time', tab.Properties.VariableNames) &&...
+                    ismember('sample', tab.Properties.VariableNames)
+                tab.local_time = obj.Data.time{1}(tab.sample);        
+            end                   
+            
+        end
         
     end
     
