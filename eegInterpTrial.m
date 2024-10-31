@@ -43,6 +43,10 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
         distance = 50;
     end
     
+    if ~exist('crit_min_good_neighbours', 'var') || isempty(crit_min_good_neighbours)
+        crit_min_good_neighbours = 3;
+    end
+    
     % convert art structure - this is temporaray and will change
     warning('Fix this')
     if isnumeric(art) || islogical(art)
