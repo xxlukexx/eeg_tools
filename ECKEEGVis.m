@@ -220,10 +220,12 @@ classdef ECKEEGVis < handle
             % screen defaults
             obj.privScreenOpen = false;
             obj.privScreenNumber = max(Screen('screens'));
+            obj.privScreenNumber = 0;
+            warning('debug: remove hardcoded screen number == 0')
             if obj.privScreenNumber == 0
                 % small window as only one screen
                 obj.privWindowSize = round(...
-                    Screen('Rect', obj.privScreenNumber) .* .25);
+                    Screen('Rect', obj.privScreenNumber) .* .50);
                 obj.privFullscreen = false;
             else
                 % fullscreen
@@ -378,12 +380,12 @@ classdef ECKEEGVis < handle
                 createLayer = createLayer && ~isempty(idx);
             end
             if createLayer
-                if isempty(obj.privData.art.art)
+                if isempty(obj.privData.art)
                     idx = 1;
                 else
-                    idx = size(obj.privData.art.art, 3) + 1;
+                    idx = size(obj.privData.art, 3) + 1;
                 end
-                obj.privData.art.art(:, :, idx) =...
+                obj.privData.art(:, :, idx) =...
                     false(length(obj.privData.label),...
                     obj.privNumTrials);
                 obj.privData.art_type{idx} = 'manual';
@@ -659,7 +661,7 @@ classdef ECKEEGVis < handle
                 
                 % draw background colour (red if any artefacts)
 %                 if any(obj.privArt(:, obj.Trial, obj.privArtLayer))
-                if any(any(obj.privData.art.art(:, obj.Trial, :)))
+                if any(any(obj.privData.art(:, obj.Trial, :)))
                     Screen('FillRect', obj.privWinPtr, obj.Col_ArtefactBG);
                 else
                     Screen('FillRect', obj.privWinPtr, obj.Col_BG);
@@ -679,7 +681,7 @@ classdef ECKEEGVis < handle
                         obj.privChanY' + obj.privChanH' + obj.privDrawOffset(2)];
                     
                     % select colours for bad channels
-                    bad = any(obj.privData.art.art(:, obj.privTrial, :), 3);
+                    bad = any(obj.privData.art(:, obj.privTrial, :), 3);
                     chanBGCols =...
                         repmat(obj.Col_ChanBG', 1, obj.privNumChannels);
                     chanBGCols(:, bad) =...
@@ -759,7 +761,7 @@ classdef ECKEEGVis < handle
                         if ch == obj.privChanHover, lineW = 2; else...
                                 lineW = 1; end
 %                         if obj.privArt(ch, obj.privTrial, obj.privArtLayer) &&...
-                        if any(obj.privData.art.art(ch, obj.privTrial, :), 3) &&...
+                        if any(obj.privData.art(ch, obj.privTrial, :), 3) &&...
                                 ~obj.privDataHasOverlay
                             lineCol = obj.Col_ArtefactLine;
 %                             lineCol = obj.Col_Series(ol, :);
@@ -853,10 +855,10 @@ classdef ECKEEGVis < handle
                             obj.Col_Label, obj.Col_LabelBG);
                         
                         % draw artefact details (if present)
-                        curArt = obj.privData.art.art(obj.privChanHover, obj.Trial, :);
+                        curArt = obj.privData.art(obj.privChanHover, obj.Trial, :);
                         if any(curArt)
                             artType =...
-                                cell2char(obj.privData.art.art_type(logical(curArt)));
+                                cell2char(obj.privData.art_type(logical(curArt)));
                             Screen('DrawText', obj.privWinPtr, artType, hrX1, hrY2,...
                                 obj.Col_Label, obj.Col_LabelBG);
                         end
@@ -907,8 +909,8 @@ classdef ECKEEGVis < handle
                         obj.Col_Label);
                     
                     % draw art info
-                    artGood = sum(~obj.privData.art.art(:, obj.privTrial));
-                    artBad = sum(obj.privData.art.art(:, obj.privTrial));
+                    artGood = sum(~obj.privData.art(:, obj.privTrial));
+                    artBad = sum(obj.privData.art(:, obj.privTrial));
                     artTotal = obj.privNumChannels;
                     percGood = (artGood / artTotal) * 100;
                     percBad = (artBad / artTotal) * 100;
@@ -997,7 +999,7 @@ classdef ECKEEGVis < handle
                     % artefacts
                     tlCol = repmat([obj.Col_FlagGood, 150],...
                         obj.privNumTrials, 1);
-                    anyArt = any(obj.privData.art.art, 3);
+                    anyArt = any(obj.privData.art, 3);
                     bad = any(anyArt, 1);
                     tlCol(bad, 1:3) = repmat(obj.Col_FlagBad, sum(bad), 1);
                     propArt = sum(anyArt, 1) / max(sum(anyArt, 1));
@@ -1110,14 +1112,14 @@ classdef ECKEEGVis < handle
                 % toggle artefact flag on single channel on current trial
                 if mButtons(1) && ~isempty(obj.privChanHover)
                     % get current artefact status
-                    curArt = obj.privData.art.art(obj.privChanHover, obj.privTrial, obj.privArtLayer);
+                    curArt = obj.privData.art(obj.privChanHover, obj.privTrial, obj.privArtLayer);
                     switch curArt
                         case false  % not current art, mark as art
-%                                 obj.privData.art.artType{obj.privChanHover, obj.privTrial} = 'Manual';
-                            obj.privData.art.art(obj.privChanHover, obj.privTrial, obj.privArtLayer) = true;
+%                                 obj.privData.artType{obj.privChanHover, obj.privTrial} = 'Manual';
+                            obj.privData.art(obj.privChanHover, obj.privTrial, obj.privArtLayer) = true;
                         case true   % is currently art, mark as not art
-%                                 obj.privData.art.artType{obj.privChanHover, obj.privTrial} = [];                              
-                            obj.privData.art.art(obj.privChanHover, obj.privTrial, obj.privArtLayer) = false;
+%                                 obj.privData.artType{obj.privChanHover, obj.privTrial} = [];                              
+                            obj.privData.art(obj.privChanHover, obj.privTrial, obj.privArtLayer) = false;
                     end
 %                         obj.Art(obj.privChanHover, obj.privTrial) =...
 %                             ~obj.Art(obj.privChanHover, obj.privTrial);
@@ -1169,16 +1171,16 @@ classdef ECKEEGVis < handle
                     case '-_'           % zoom out
                         obj.Zoom = .8;
                     case 'a'            % mark all art
-                        if ~all(obj.privData.art.art(:, obj.privTrial, obj.privArtLayer))
-%                                 obj.privData.art.artType(:, obj.privTrial) =...
+                        if ~all(obj.privData.art(:, obj.privTrial, obj.privArtLayer))
+%                                 obj.privData.artType(:, obj.privTrial) =...
 %                                     repmat({'Manual'}, obj.privNumChannels, 1);
-                            obj.privData.art.art(:, obj.privTrial, obj.privArtLayer) = true;
+                            obj.privData.art(:, obj.privTrial, obj.privArtLayer) = true;
                         else
-                            obj.privData.art.art(:, obj.privTrial, obj.privArtLayer) = false;
+                            obj.privData.art(:, obj.privTrial, obj.privArtLayer) = false;
                         end
                         reDrawNeeded = true;
                     case 'n'            % mark none art
-                        obj.privData.art.art(:, obj.privTrial, obj.privArtLayer) = false;
+                        obj.privData.art(:, obj.privTrial, obj.privArtLayer) = false;
                     case 'c'            % centre display
                         obj.privDrawSize = obj.privWindowSize;
                         obj.privZoom = 1;
@@ -1190,7 +1192,7 @@ classdef ECKEEGVis < handle
                         hIdx = obj.privArtHistoryIdx - 1;
                         if hIdx > 1 
                             obj.privArtHistoryIdx = hIdx;
-                            obj.privData.art.art =...
+                            obj.privData.art =...
                                 obj.privArtHistory{hIdx};
                             reDrawNeeded = true;
                         end
@@ -1199,7 +1201,7 @@ classdef ECKEEGVis < handle
                         if hIdx <= length(obj.privArtHistory) &&...
                                 ~isempty(obj.privArtHistory(hIdx))
                             obj.privArtHistoryIdx = hIdx;
-                            obj.privData.art.art =...
+                            obj.privData.art =...
                                 obj.privArtHistory{hIdx};
                             reDrawNeeded = true;
                         end
@@ -1233,10 +1235,10 @@ classdef ECKEEGVis < handle
                     case 'LeftGUI'          % mark/unmark all
                         if ~obj.privLastMouseButtons(1) && mButtons(1) &&...
                                 ~isempty(obj.privChanHover)
-                            if ~all(obj.privData.art.art(obj.privChanHover, :, obj.privArtLayer))
-                                obj.privData.art.art(obj.privChanHover, :, obj.privArtLayer) = true;  
+                            if ~all(obj.privData.art(obj.privChanHover, :, obj.privArtLayer))
+                                obj.privData.art(obj.privChanHover, :, obj.privArtLayer) = true;  
                             else
-                                obj.privData.art.art(obj.privChanHover, :, obj.privArtLayer) = false;  
+                                obj.privData.art(obj.privChanHover, :, obj.privArtLayer) = false;  
                             end
                         end
                 end
