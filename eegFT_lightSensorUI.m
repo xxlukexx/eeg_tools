@@ -19,6 +19,8 @@ classdef eegFT_lightSensorUI < handle
         Crit_DurationRange = [0.140, 0.210];
         Crit_ThresholdZ = 4;
         UnwantedEvents = [255]
+        SyncPointSession = []
+        SyncPointEEG = []
         SessionEEGOffset = 0;
         idxLightSensorChannel = 8
     end
@@ -73,6 +75,9 @@ classdef eegFT_lightSensorUI < handle
             ui_btnMouseSelect
             ui_btnIgnoreSelection
             ui_btnLightSensor2Events
+            ui_btnSetSessionSyncPoint
+            ui_btnSetEEGSyncPoint
+            ui_btnRecreateEvents
             
             % tools
             uiCurrentTool = 'none'
@@ -486,6 +491,15 @@ classdef eegFT_lightSensorUI < handle
                 {'local_time', 'label', 'eeg_code', 'source', 'wanted'},...
                 'before', 1);
             
+            % handle non-text event labels
+                
+                idx_non_text = ~cellfun(@ischar, tab.label);
+                for i = 1:size(tab, 1)
+                    if idx_non_text(i)
+                        tab.label{i} = extract_text_from_cell(tab.label{i});
+                    end
+                end
+            
             % Color code each section of the label
             
                 % Define a function to blend colors with white
@@ -527,6 +541,21 @@ classdef eegFT_lightSensorUI < handle
         end
         
         % sync
+        
+        function UpdateSync(obj)
+        
+            if isempty(obj.SyncPointEEG) || ~isnumeric(obj.SyncPointEEG)
+                return
+            end
+
+            if isempty(obj.SyncPointSession) || ~isnumeric(obj.SyncPointSession)
+                return
+            end
+            
+            obj.SessionEEGOffset = obj.SyncPointEEG - obj.SyncPointSession;
+            obj.UpdateUI_Events
+            
+        end
         
         function [tab1, tab2, pairs] = PairEvents(obj, event_type1, event_type2, tolerance_s)
         % pairs two event types (e.g. EEG and light sensor) if they are
@@ -1205,10 +1234,7 @@ classdef eegFT_lightSensorUI < handle
         
         function CreateUI_SessionInfo(obj)
             
-            str = sprintf('Light sensor channel: %s\n',...
-                obj.LightSensorChannelLabel);
-            str = sprintf('%sDuration (EEG | session): %.0fs | %.0fs\n',...
-                str, obj.DurationEEG, obj.DurationSession);
+            str = '<instantiating>';
             
             obj.uiSessionInfo_label = uicontrol(...
                 'Parent', obj.uiSessionInfo,...
@@ -1219,6 +1245,39 @@ classdef eegFT_lightSensorUI < handle
                 'Style', 'text',...
                 'FontSize', 16,...
                 'String', str);
+            
+            obj.UpdateUI_SessionInfo;
+            
+        end
+        
+        function UpdateUI_SessionInfo(obj)
+            
+            % light sensor
+            str = sprintf('Light sensor channel: %s\n',...
+                obj.LightSensorChannelLabel);
+            
+            % durations
+            str = sprintf('%sDuration (EEG | session): %.0fs | %.0fs\n',...
+                str, obj.DurationEEG, obj.DurationSession);            
+            
+            % sync points
+
+                if isempty(obj.SyncPointSession)
+                    sync_point_session = '<not set>';
+                else
+                    sync_point_session = sprintf('%.3fs', obj.SyncPointSession);
+                end
+
+                if isempty(obj.SyncPointEEG)
+                    sync_point_eeg = '<not set>';
+                else
+                    sync_point_eeg = sprintf('%.3fs', obj.SyncPointEEG);
+                end
+                
+                str = sprintf('%sSync time (EEG | session) %s | %s \n',...
+                    str, sync_point_eeg, sync_point_session);    
+                
+                obj.uiSessionInfo_label.String = str;
             
         end
         
@@ -1271,56 +1330,51 @@ classdef eegFT_lightSensorUI < handle
         end
         
         function CreateUI_Controls(obj)
-            
-            % buttons we want are: 
-            % 
-            % 1. horizontal scroll left
-            % 2. horizontal scroll right
-            % 3. vertical zoom increase
-            % 4. vertical zoom decrease
-            % 5. vertical zoom reset
-            % 6. horizontal zoom increase
-            % 7. horizontal zoom decrease
-            % 8. horizontal zoom reset
 
-            % figure out spacing/positions
-
+            % Define the buttons with an added width column
             buttons = {...
-                'ui_btnScrollLeft',         '←'             ;...  % Left arrow
-                'ui_btnScrollRight',        '→'             ;...  % Right arrow
-                'ui_btnHorizZoomIn',        '⇔+'            ;...  % Horizontal double arrow with plus
-                'ui_btnHorizZoomOut',       '⇔-'            ;...  % Horizontal double arrow with minus
-                'ui_btnHorizZoomReset',     '↺'             ;...  % Counterclockwise arrow (reset)
-                'ui_btnVertZoomIn',         '⇑+'            ;...  % Upwards double arrow with plus
-                'ui_btnVertZoomOut',        '⇓-'            ;...  % Downwards double arrow with minus
-                'ui_btnVertZoomReset',      '↺'             ;...  % Counterclockwise arrow (reset)
-                'ui_btnMouseZoom',          'Zoom'          ;...
-                'ui_btnMouseSelect',        'Select'        ;...
-                'ui_btnIgnoreSelection',    'Ignore'        ;...
-                'ui_btnLightSensor2Events'  'LS2Events'     ;...
+                'ui_btnScrollLeft',         '←',          80;...  
+                'ui_btnScrollRight',        '→',          80;...
+                'ui_btnHorizZoomIn',        '⇔+',         80;...
+                'ui_btnHorizZoomOut',       '⇔-',         80;...
+                'ui_btnHorizZoomReset',     '↺',          80;...
+                'ui_btnVertZoomIn',         '⇑+',         80;...
+                'ui_btnVertZoomOut',        '⇓-',         80;...
+                'ui_btnVertZoomReset',      '↺',          80;...
+                'ui_btnMouseZoom',          'Zoom',       80;...
+                'ui_btnMouseSelect',        'Select',     90;...
+                'ui_btnIgnoreSelection',    'Ignore',     90;...
+                'ui_btnLightSensor2Events', 'LS2Events', 135;...                
+                'ui_btnSetSessionSyncPoint','SetSesSync',150;...
+                'ui_btnSetEEGSyncPoint',    'SetEEGSync',150;...     
+                'ui_btnRecreateEvents',     'Recreate',  130;...        
             };
 
             num_buttons = size(buttons, 1);
-            w_button = 90;
             h_panel = getpixelposition(obj.uiControls);
             h_button = h_panel(4);
-            h_gap = h_button * .05;
+            h_gap = h_button * 0.05;
+            x_pos = 0; % Initialize horizontal position
+
             for b = 1:num_buttons
-                obj.(buttons{b}) = uicontrol(...
-                    'style', 'pushbutton', ...
+                width = buttons{b, 3}; % Get the width for this button
+                obj.(buttons{b, 1}) = uicontrol(...
+                    'Style', 'pushbutton', ...
                     'Parent', obj.uiControls, ...
                     'Units', 'pixels', ...
-                    'position', [w_button * (b-1), h_gap, w_button, h_button - (2 * h_gap)], ...
+                    'Position', [x_pos, h_gap, width, h_button - (2 * h_gap)], ...
                     'String', buttons{b, 2}, ...
                     'FontSize', 24, ...
-                    'Callback', @obj.ui_btnClick,...
-                    'Tag', buttons{b, 1},...
-                    'BackgroundColor', obj.BackgroundColor,...
-                    'ForegroundColor', obj.ForegroundColor,...
+                    'Callback', @obj.ui_btnClick, ...
+                    'Tag', buttons{b, 1}, ...
+                    'BackgroundColor', obj.BackgroundColor, ...
+                    'ForegroundColor', obj.ForegroundColor, ...
                     'Visible', 'on');
+                x_pos = x_pos + width; % Update horizontal position for next button
             end
 
         end
+
                 
         function UpdateUI(obj, ~, event)
             
@@ -1439,8 +1493,22 @@ classdef eegFT_lightSensorUI < handle
 
                 case 'ui_btnLightSensor2Events'
                     obj.LightSensor2Events
-
-
+                    
+                case 'ui_btnSetSessionSyncPoint'
+                    if ~isempty(obj.selectedEventIdx) && isnumeric(obj.selectedEventIdx)
+                        s = table2struct(obj.formattedEvents(obj.selectedEventIdx, :));
+                        obj.SyncPointSession = s.local_time;
+                    end
+                    
+                case 'ui_btnSetEEGSyncPoint'   
+                    if ~isempty(obj.selectedEventIdx) && isnumeric(obj.selectedEventIdx)
+                        s = table2struct(obj.formattedEvents(obj.selectedEventIdx, :));
+                        obj.SyncPointEEG = s.local_time;
+                    end
+                    
+                case 'ui_btnRecreateEvents'
+                    obj.RecreateEEGEventsFromSessionEventsAndLightSensor
+                    
             end
 
             % Redraw the graph after updating the properties
@@ -1786,6 +1854,18 @@ classdef eegFT_lightSensorUI < handle
             
             val = obj.Session.Log.LogArray{end}.timestamp - obj.Session.Log.LogArray{1}.timestamp;      
             
+        end
+        
+        function set.SyncPointSession(obj, val)
+            obj.SyncPointSession = val;
+            obj.UpdateUI_SessionInfo;
+            obj.UpdateSync
+        end
+        
+        function set.SyncPointEEG(obj, val)
+            obj.SyncPointEEG = val;
+            obj.UpdateUI_SessionInfo;
+            obj.UpdateSync
         end
        
     end

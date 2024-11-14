@@ -46,6 +46,7 @@ classdef tePeakFinder_local < handle
         prMetadataDirty = false
         prTableUpdating = false
         prTableSelectedRow 
+        prPath_Metadata
     end 
     
     properties (Constant)
@@ -60,7 +61,7 @@ classdef tePeakFinder_local < handle
     methods
         
         % constructor
-        function obj = tePeakFinder_local(def, erpVarName, path_mat, path_temp, hide_valid)
+        function obj = tePeakFinder_local(def, erpVarName, path_mat, path_temp, hide_valid, path_metadata)
         % pass this method a peak definition to initiate the peak finder
         
             % optionally can hide valid peaks, useful when reviewing,
@@ -68,6 +69,22 @@ classdef tePeakFinder_local < handle
             if ~exist('hide_valid', 'var') || isempty(hide_valid)
                 hide_valid = false;
             end
+            
+        % metadata.mat is the default metadata filename, but this can vary.
+        % Optionally accept an input argument as an absolute path to the
+        % metdata file. If this is left empty, then it defaults to
+        % metadata.mat
+        
+            if ~exist('path_metadata', 'var') || isempty(path_metadata)
+                path_metadata = fullfile(path_mat, 'metadata.mat');
+            end
+            
+            % check that the metadata file exists
+            if ~exist(path_metadata, 'file') 
+                error('Metadata file not found at: %s', path_metadata)
+            end
+            
+            obj.prPath_Metadata = path_metadata;
         
         % check that the format of the peak def is valid
         
@@ -357,7 +374,8 @@ classdef tePeakFinder_local < handle
         
         function readMetadata(obj, hide_valid)
             
-            file_md = fullfile(obj.PathData, 'metadata.mat');
+%             file_md = fullfile(obj.PathData, 'metadata.mat');
+            file_md = obj.prPath_Metadata;
             if ~exist(file_md, 'file')
                 error('Cannot find metadata.mat in %s', obj.PathData)
             end
@@ -954,7 +972,8 @@ classdef tePeakFinder_local < handle
             tab = obj.Table(:, 1:6);
             obj.Metadata{obj.SelectedRow} = obj.SelectedMetadata;
             md = obj.Metadata;
-            file_out = fullfile(obj.PathData, 'metadata.mat');
+%             file_out = fullfile(obj.PathData, 'metadata.mat');
+            file_out = obj.prPath_Metadata;
             save(file_out, 'md', 'tab');
             
 %             % update database
