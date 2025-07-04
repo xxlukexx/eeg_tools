@@ -189,7 +189,7 @@ classdef tePeakFinder_local < handle
 
                 % find peak
                 [amp, lat] = eegFindPeak(erp, pd(p).window,...
-                    pd(p).electrode, [], pd(p).polarity);
+                    pd(p).electrode, pd(p).polarity);
                 
                 % store in md
                 md_lat = obj.buildLabel(p, 'lat');
@@ -249,7 +249,7 @@ classdef tePeakFinder_local < handle
 
             % find peak
             [amp, lat] = eegFindPeak(erp, win_edges,...
-                pd.electrode, [], pd.polarity);
+                pd.electrode, pd.polarity);
 
             % store in md
             md_lat = obj.buildLabel(idx, 'lat');

@@ -220,8 +220,8 @@ classdef ECKEEGVis < handle
             % screen defaults
             obj.privScreenOpen = false;
             obj.privScreenNumber = max(Screen('screens'));
-            obj.privScreenNumber = 0;
-            warning('debug: remove hardcoded screen number == 0')
+%             obj.privScreenNumber = 0;
+%             warning('debug: remove hardcoded screen number == 0')
             if obj.privScreenNumber == 0
                 % small window as only one screen
                 obj.privWindowSize = round(...
