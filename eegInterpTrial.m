@@ -28,7 +28,7 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
     %                   were interpolated
     % interpMat     -   [channel x trial] matrix, indicating which channel
     %                   x trial combinations were interpolated
-    % interpNeigh   -   for each channel, indices of neighbouring channels
+    % interpNeigh   -   for each channel, labels of neighbouring channels
     %                   that were used to interpolate from
     % cantInterp    -   indices of channels that were bad, but could not be
     %                   interpolated due to having no clean neighbours
@@ -110,9 +110,11 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
             cfg.neighbours = canInterpNb;
             tmpi = ft_channelrepair(cfg, tmp);
             tmp_interpMat(canInterp) = true;
-            tmp_interpNeigh(canInterp) = {canInterp};            
-%             interpMat(canInterp, tr) = true;
-%             interpNeigh(canInterp, tr) = {canInterp};
+
+            % store labels of channels used to interpolate
+            if isequal(tmp.label, {canInterpNb.label}')
+               tmp_interpNeigh(canInterp) = {canInterpNb(canInterp).neighblabel};  
+            end
             
             % replace original trial data
             tmp_trial{tr} = tmpi.trial{:};
@@ -124,7 +126,7 @@ function [data, chanInterp, trialInterp, totInterp, propInterp,...
         end
         
         interpMat(:, tr) = tmp_interpMat;
-        interpNeigh(:, tr) = tmp_interpNeigh;
+        interpNeigh(:, tr) = tmp_interpNeigh; % labels of channels used
         interp(:, tr) = tmp_interp;
         excl(:, tr) = tmp_excl;
 
