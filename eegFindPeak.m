@@ -1,7 +1,16 @@
 function [pk, locS] = eegFindPeak(erp, searchTimeS, chanLabel, dir)
 
+    pk = [];
+    locS = [];
+
     if ~exist('dir', 'var')
         dir = 'positive';
+    end
+
+    % Some legacy processing paths represent a missing condition with an
+    % empty ERP. Preserve that missingness instead of dereferencing it.
+    if isempty(erp)
+        return
     end
     
     if any(isnan(searchTimeS))

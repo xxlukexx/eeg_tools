@@ -14,6 +14,7 @@ classdef tePeakFinder_local < handle
         SelectedData
         SelectedRow
         Path_Temp
+        XLim
     end
     
     properties (Dependent, SetAccess = private)
@@ -61,7 +62,7 @@ classdef tePeakFinder_local < handle
     methods
         
         % constructor
-        function obj = tePeakFinder_local(def, erpVarName, path_mat, path_temp, hide_valid, path_metadata)
+        function obj = tePeakFinder_local(def, erpVarName, path_mat, path_temp, hide_valid, path_metadata, xLimits)
         % pass this method a peak definition to initiate the peak finder
         
             % optionally can hide valid peaks, useful when reviewing,
@@ -69,6 +70,15 @@ classdef tePeakFinder_local < handle
             if ~exist('hide_valid', 'var') || isempty(hide_valid)
                 hide_valid = false;
             end
+
+            % Optionally constrain the displayed ERP time range. NaNs retain
+            % MATLAB's automatic axis limits and preserve legacy calls.
+            if ~exist('xLimits', 'var') || isempty(xLimits)
+                xLimits = [nan, nan];
+            end
+            validateattributes(xLimits, {'numeric'}, ...
+                {'real', 'vector', 'numel', 2}, mfilename, 'xLimits');
+            obj.XLim = reshape(xLimits, 1, 2);
             
         % metadata.mat is the default metadata filename, but this can vary.
         % Optionally accept an input argument as an absolute path to the
@@ -580,7 +590,11 @@ classdef tePeakFinder_local < handle
                     'interpreter', 'none',...
                     'parent', obj.h_channels_subplots(c)...
                 );
-                
+
+                if all(isfinite(obj.XLim))
+                    xlim(obj.h_channels_subplots(c), obj.XLim);
+                end
+
             % draw peak
                 
                 md_lat = sprintf('%s_%s_lat_%s',...
@@ -1110,4 +1124,3 @@ classdef tePeakFinder_local < handle
     end
     
 end
-        

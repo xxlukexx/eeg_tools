@@ -1,5 +1,11 @@
 function erp = eegStorePeak(erp, label, chan, amp, loc)
 
+    % Missing ERP conditions are valid in older datasets. There is nothing
+    % to annotate, so return the empty value unchanged.
+    if isempty(erp)
+        return
+    end
+
     numChans = length(erp.label);
     
     % check whether a peaks structure exists
