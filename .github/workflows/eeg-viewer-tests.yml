@@ -1,0 +1,38 @@
+name: EEG Viewer tests
+
+on:
+  push:
+    paths:
+      - "benchmarks/python_rendering/**"
+      - ".github/workflows/eeg-viewer-tests.yml"
+  pull_request:
+    paths:
+      - "benchmarks/python_rendering/**"
+      - ".github/workflows/eeg-viewer-tests.yml"
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: benchmarks/python_rendering
+    env:
+      QT_QPA_PLATFORM: offscreen
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: benchmarks/python_rendering/pyproject.toml
+      - name: Install viewer and test dependencies
+        run: python -m pip install -e ".[test]"
+      - name: Run tests
+        run: python -m pytest
+      - name: Verify command entry point
+        run: eeg-viewer --version

@@ -1,3 +1,14 @@
 
 .DS_Store
 *.m~
+
+# Python renderer benchmark (local/user-owned runtime state)
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+benchmarks/python_rendering/results/*.json
+benchmarks/python_rendering/results/*.log
+benchmarks/python_rendering/results/*.mat
+benchmarks/python_rendering/results/*.png
