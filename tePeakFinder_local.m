@@ -550,6 +550,7 @@ classdef tePeakFinder_local < handle
                 h_red = h_sp.Position(4) * .2;
                 h_sp.Position(4) = h_sp.Position(4) - h_red;
                 obj.h_channels_subplots(c) = h_sp;
+                h_plot_parent = obj.graphicsHandle(h_sp);
                 
             % get data
                 
@@ -579,7 +580,7 @@ classdef tePeakFinder_local < handle
                 pl = plot(erp.time, dat,...
                     'ButtonDownFcn', @obj.ManualFindPeak,...
                     'tag', num2str(c),...
-                    'parent', obj.h_channels_subplots(c));
+                    'parent', h_plot_parent);
                 
                 % tag axis
                 h_ax = get(pl, 'parent');
@@ -588,7 +589,7 @@ classdef tePeakFinder_local < handle
                 % title
                 title(str{c},...
                     'interpreter', 'none',...
-                    'parent', obj.h_channels_subplots(c)...
+                    'parent', h_plot_parent...
                 );
 
                 if all(isfinite(obj.XLim))
@@ -602,17 +603,17 @@ classdef tePeakFinder_local < handle
                 md_amp = sprintf('%s_%s_amp_%s',...
                     pd.condition, pd.component, pd.electrode);
                 
-                hold(obj.h_channels_subplots(c), 'on')
+                hold(h_plot_parent, 'on')
                 if isfield(mds, 'erp_peaks') && isfield(mds.erp_peaks, md_lat) && isfield(mds.erp_peaks, md_amp)
                     scatter(mds.erp_peaks.(md_lat), mds.erp_peaks.(md_amp), 60, 'd',...
-                        'parent', obj.h_channels_subplots(c),...
+                        'parent', h_plot_parent,...
                         'MarkerFaceColor', 'r')
                 end 
                 
             % label peak
             if isfield(mds, 'erp_peaks') && isfield(mds.erp_peaks, md_lat) && isfield(mds.erp_peaks, md_amp)
                 text(mds.erp_peaks.(md_lat) + .07, mds.erp_peaks.(md_amp), sprintf('%.0fms',...
-                    mds.erp_peaks.(md_lat)* 1e3), 'parent', obj.h_channels_subplots(c));
+                    mds.erp_peaks.(md_lat)* 1e3), 'parent', h_plot_parent);
             end                
                 
 %             % draw window
@@ -670,7 +671,7 @@ classdef tePeakFinder_local < handle
                 set(h_ax, 'xgrid', 'on')
                 set(h_ax, 'XTickLabel', [])          
                 line([0, 0], [min(ylim(h_ax)), max(ylim(h_ax))],...
-                    'parent', obj.h_channels_subplots(c),...
+                    'parent', h_plot_parent,...
                     'color', 'k')
                 
                 % colour subplot by rating
@@ -1082,6 +1083,12 @@ classdef tePeakFinder_local < handle
             % set ERP background colour
             col = obj.colourByLabel(val);
             set(obj.h_channels_subplots(idx), 'color', col)
+        end
+
+        function h = graphicsHandle(~, h)
+            if isnumeric(h)
+                h = handle(h);
+            end
         end
         
         function col = colourByLabel(~, label)
