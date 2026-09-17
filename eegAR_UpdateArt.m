@@ -1,4 +1,4 @@
-function data = eegAR_UpdateArt(data, m, type)
+function data = eegAR_UpdateArt(data, m, type, varargin)
 % data = EEGAR_UPDATEART(data, m, type) creates or updates an existing
 % artefact structure with new artefact data. DATA is the fieldtrip data
 % structure that is being worked on. It may or may not have an existing
@@ -14,38 +14,69 @@ function data = eegAR_UpdateArt(data, m, type)
 % artefacts of the same type using a logical OR. This means that new
 % artefact marks will be combined with the existing, without anything being
 % overwritten. To clear artefacts once a trial x channel segment has been
-% successfully interpolated, call eegAR_ResetArtByInterp. 
+% successfully interpolated, call eegAR_ResetArtFromInterp.
+%
+% Optional name/value inputs preserve the historical combine behaviour:
+%
+%   'mode'       - 'combine' (default) or 'replace'
+%   'settings'   - detector settings stored alongside .art_type
 %
 
-    % get number of chans/trials
-    numChans        = size(data.trial{1}, 1);
-    numTrials       = length(data.trial);
-    
-    % does art field exist?
-    if ~isfield(data, 'art')
-        data.art = false(numChans, numTrials);
-        data.art_type = {type};
-    elseif ~isfield(data, 'art_type')
-        error('.art structure found but no corresponding .art_type.')
-    end
-    
-    % check sizes
-    if size(data.art, 1) ~= size(m, 1) || size(data.art, 2) ~= size(m, 2)
-        error('Size mismatch between existing .art structure and new structure.')
-    end
-        
-    % lookup marks for this type
-    found = strcmpi(data.art_type, type);
-    if sum(found) > 1
-        error('Multiple entries found for artefact type %s.', type)
-    elseif ~any(found)
-        % create new entry
-        idx = length(data.art_type);
-        data.art_type{idx + 1} = type;
-        data.art(:, :, idx + 1) = m;
-    else
-        % update existing
-        data.art(:, :, found) = data.art(:, :, found) | m;
-    end
+	parser = inputParser;
+	addParameter(parser, 'mode', 'combine', ...
+		@(value) ischar(value) || (isstring(value) && isscalar(value)))
+	addParameter(parser, 'settings', struct, ...
+		@(value) isstruct(value) && isscalar(value))
+	parse(parser, varargin{:})
 
+	mode = lower(string(parser.Results.mode));
+	assert(ismember(mode, ["combine", "replace"]), ...
+		'eegAR:InvalidUpdateMode', ...
+		'Artifact update mode must be combine or replace.')
+
+	type = char(string(type));
+	m = logical(m);
+	numChannels = size(data.trial{1}, 1);
+	numTrials = numel(data.trial);
+
+	if ~isfield(data, 'art')
+		data.art = false(numChannels, numTrials, 0);
+		data.art_type = cell(1, 0);
+	elseif ~isfield(data, 'art_type')
+		error('.art structure found but no corresponding .art_type.')
+	end
+
+	assert(size(m, 1) == numChannels && size(m, 2) == numTrials, ...
+		'eegAR:ArtifactSizeMismatch', ...
+		'Artifact matrix must be channels by trials.')
+	assert(size(data.art, 1) == numChannels && ...
+		size(data.art, 2) == numTrials, ...
+		'eegAR:ArtifactSizeMismatch', ...
+		'Existing artifact marks do not match the data dimensions.')
+
+	if ~isfield(data, 'art_cfg')
+		data.art_cfg = cell(size(data.art_type));
+	elseif numel(data.art_cfg) < numel(data.art_type)
+		data.art_cfg(end + 1:numel(data.art_type)) = {struct};
+	end
+
+	found = find(strcmpi(data.art_type, type));
+	assert(numel(found) <= 1, 'eegAR:DuplicateArtifactType', ...
+		'Multiple entries found for artifact type %s.', type)
+
+	if isempty(found)
+		index = numel(data.art_type) + 1;
+		data.art_type{index} = type;
+		data.art(:, :, index) = m;
+	else
+		index = found;
+
+		if mode == "combine"
+			data.art(:, :, index) = data.art(:, :, index) | m;
+		else
+			data.art(:, :, index) = m;
+		end
+	end
+
+	data.art_cfg{index} = parser.Results.settings;
 end

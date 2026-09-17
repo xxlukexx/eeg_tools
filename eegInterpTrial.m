@@ -1,140 +1,112 @@
-function [data, chanInterp, trialInterp, totInterp, propInterp,...
-    interpMat, interpNeigh, cantInterp] =...
-    eegInterpTrial(data, art, distance, nb, crit_min_good_neighbours)
+function [data, chanInterp, trialInterp, totInterp, propInterp, ...
+		interpMat, interpNeigh, cantInterp] = ...
+		eegInterpTrial(data, art, distance, neighbours, minimumGoodNeighbours)
+	%EEGINTERPTRIAL Repair marked channel-by-trial segments with FieldTrip.
+	%
+	% ART may be a logical channel x trial array, a layered logical array, or
+	% a structure with a .matrix field. Historical defaults are retained.
 
-    % [data, chanInterp, trialInterp, totInterp, propInterp,...
-    %       interpMat, interpNeigh, cantInterp] =...
-    %       eegInterpTrial(data, art, distance, nb)
-    %
-    % Interpolate channels on a per-trial basis. 
-    %
-    % INPUT ARGS
-    % data          -   fieldtrip data
-    % art           -   artefact matrix, logical, [channels x trials]
-    % distance      -   (optional) max distance to neighbouring electrodes
-    %                   for them to be be interpolated from (def. 50mm)
-    % nb            -   (optional) fieldtrip neighbours structure. Will be
-    %                   calculated if not supplied. Save time by passing a
-    %                   previously used structure. 
-    % crit_min_good_neighbours - criterion for min num of good (clean)
-    %                   neighbouring electrodes to interp FROM
-    %
-    % OUTPUT ARGS
-    % data          -   intepolated data
-    % chanInterp    -   number of interpolated channels per trial
-    % trialInterp   -   number of interpolated trials per channel
-    % totInterp     -   total number of channel x trial interpolations
-    % propInterp    -   proportion of channel x trial combinations that
-    %                   were interpolated
-    % interpMat     -   [channel x trial] matrix, indicating which channel
-    %                   x trial combinations were interpolated
-    % interpNeigh   -   for each channel, indices of neighbouring channels
-    %                   that were used to interpolate from
-    % cantInterp    -   indices of channels that were bad, but could not be
-    %                   interpolated due to having no clean neighbours
-    
-    numBad = 0;
-    numInterp = 0;
-    interpMat = false(length(data.label), length(data.trial));
-    interpNeigh = cell(length(data.label), length(data.trial));
-    cantInterp = false(length(data.label), length(data.trial));
+	if nargin < 3 || isempty(distance)
+		distance = 50;
+	end
 
-    if ~exist('distance', 'var') || isempty(distance)
-        distance = 50;
-    end
-    
-    if ~exist('crit_min_good_neighbours', 'var') || isempty(crit_min_good_neighbours)
-        crit_min_good_neighbours = 3;
-    end
-    
-    % convert art structure - this is temporaray and will change
-    warning('Fix this')
-    if isnumeric(art) || islogical(art)
-        matrix = art;
-        art = struct;
-        art.matrix = matrix;
-    end
-    
-    % get ft neighbours structure for determining electrodes to intepolate
-    % from 
-    if ~exist('nb', 'var')
-        cfg = [];
-        cfg.method = 'distance';
-        cfg.layout = data.elec;
-        cfg.neighbourdist = distance;
-        nb = ft_prepare_neighbours(cfg, data); 
-    end
-    
-    % flags to store which trials/channels were interpolated/excluded
-    interp = false(length(data.label), length(data.trial));
-    excl = false(length(data.label), length(data.trial));
-    
-    % loop through trials
-    numTr = size(data.trial, 2);
-    tmp_trial = data.trial;
-    parfor tr = 1:numTr
-        
-        tmp_interpMat = interpMat(:, tr);
-        tmp_interpNeigh = interpNeigh(:, tr);
-        tmp_interp = interp(:, tr);
-        tmp_excl = excl(:, tr);
-        
-        % check that there are some channels with artefacts on this current
-        % trial
-        if ~any(any(art.matrix(:, tr, :), 3)), continue, end
-        
-        % select data from current trial
-        cfg = [];
-        cfg.trials = false(numTr, 1);
-        cfg.trials(tr) = true;
-        data_stripped = rmfieldIfPresent(data,...
-            {'interp', 'interpNeigh', 'art', 'chanExcl'});
-        tmp = ft_selectdata(cfg, data_stripped);
-        
-        % extract channels with artefacts on this trial
-        bad = any(art.matrix(:, tr, :), 3);
-        
-        % find non-bad neighbours
-        [canInterp, canInterpLabs, canInterpNb, canInterpSmry] =...
-            eegAR_FindInterpChans(data, bad, false, nb, crit_min_good_neighbours);
-        
-        % store indices of channels that can't be interpolated
-        cantInterp(:, tr) = bad & ~canInterp;
-                
-        if any(canInterp)
-            
-            % interpolate
-            cfg = [];
-            cfg.method = 'average';
-            cfg.badchannel = canInterpLabs;
-            cfg.neighbours = canInterpNb;
-            tmpi = ft_channelrepair(cfg, tmp);
-            tmp_interpMat(canInterp) = true;
-            tmp_interpNeigh(canInterp) = {canInterp};            
-%             interpMat(canInterp, tr) = true;
-%             interpNeigh(canInterp, tr) = {canInterp};
-            
-            % replace original trial data
-            tmp_trial{tr} = tmpi.trial{:};
-            
-            % update flags
-            tmp_interp(canInterp) = true;
-            tmp_excl(bad & ~canInterp) = true;
-            
-        end
-        
-        interpMat(:, tr) = tmp_interpMat;
-        interpNeigh(:, tr) = tmp_interpNeigh;
-        interp(:, tr) = tmp_interp;
-        excl(:, tr) = tmp_excl;
+	if nargin < 5 || isempty(minimumGoodNeighbours)
+		minimumGoodNeighbours = 3;
+	end
 
-    end
-    data.trial = tmp_trial;
-    
-    % summarise interpolation
-    chanInterp = sum(interp, 2);                    % num channels with any trials interpolated
-    trialInterp = sum(interp, 1);                   % num trials with any channels interpolated
-    totInterp = sum(interp(:));                     % total num of chan x trial interpolations
-    propInterp = totInterp / length(interp(:));     % prop of chan x trial interpolations
-    
+	if isstruct(art)
+		art = art.matrix;
+	end
+
+	if ndims(art) == 3
+		art = any(art, 3);
+	end
+
+	art = logical(art);
+	numChannels = numel(data.label);
+	numTrials = numel(data.trial);
+	assert(isequal(size(art), [numChannels, numTrials]), ...
+		'eegInterpTrial:ArtifactSizeMismatch', ...
+		'Artifact marks must be channels by trials.')
+
+	if nargin < 4 || isempty(neighbours)
+		cfg = [];
+		cfg.method = 'distance';
+		cfg.elec = data.elec;
+		cfg.neighbourdist = distance;
+		cfg.feedback = 'no';
+		neighbours = ft_prepare_neighbours(cfg, data);
+	end
+
+	interpMat = false(numChannels, numTrials);
+	interpNeigh = cell(numChannels, numTrials);
+	cantInterp = false(numChannels, numTrials);
+
+	% Subject-level parallelism is handled by the calling batch. Keeping this
+	% loop serial avoids nested pools and makes FieldTrip failures attributable
+	% to one trial.
+	for trial = 1:numTrials
+		bad = art(:, trial);
+
+		if ~any(bad)
+			continue
+		end
+
+		[canInterpolate, badLabels, usableNeighbours] = ...
+			eegAR_FindInterpChans( ...
+				data, bad, false, neighbours, minimumGoodNeighbours);
+		cantInterp(:, trial) = bad & ~canInterpolate;
+
+		if ~any(canInterpolate)
+			continue
+		end
+
+		cfg = [];
+		cfg.trials = trial;
+		cfg.showcallinfo = 'no';
+		trialData = ft_selectdata(cfg, localFieldTripSignal(data)); %#ok<NASGU>
+
+		cfg = [];
+		cfg.method = 'average';
+		cfg.badchannel = badLabels;
+		cfg.neighbours = usableNeighbours;
+		cfg.feedback = 'no';
+		cfg.showcallinfo = 'no';
+		% FieldTrip prints one status block for every repaired trial. Suppress
+		% that chatter here; the caller records aggregate repair counts.
+		evalc('repaired = ft_channelrepair(cfg, trialData);');
+		data.trial{trial} = repaired.trial{1};
+		interpMat(canInterpolate, trial) = true;
+
+		for channel = find(canInterpolate)'
+			entry = find(strcmpi({usableNeighbours.label}, data.label{channel}), 1);
+
+			if ~isempty(entry)
+				interpNeigh{channel, trial} = ...
+					usableNeighbours(entry).neighblabel;
+			end
+		end
+	end
+
+	chanInterp = sum(interpMat, 2);
+	trialInterp = sum(interpMat, 1);
+	totInterp = sum(interpMat, 'all');
+	propInterp = totInterp / numel(interpMat);
+	data.interp = interpMat;
+	data.interpNeigh = interpNeigh;
+	data.cantInterp = cantInterp;
+end
+
+
+function signal = localFieldTripSignal(data)
+	signal = data;
+	customFields = { ...
+		'art', 'art_type', 'art_cfg', ...
+		'interp', 'interpNeigh', 'cantInterp', ...
+		'artifact_history', 'exclude_from_ref'};
+	present = intersect(customFields, fieldnames(signal));
+
+	if ~isempty(present)
+		signal = rmfield(signal, present);
+	end
 end
